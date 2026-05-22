@@ -1,28 +1,17 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-
-// Memanggil "kamar-kamar" yang sudah dibuat Zidan
-import DashboardPage from './pages/DashboardPage';
+import { useState } from 'react';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
+import RoomSelectionPage from './pages/RoomSelectionPage';
+import DashboardPage from './pages/DashboardPage';
 
 function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        {/* Rute 1: Jika user baru buka web, langsung arahkan ke halaman Login */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        
-        {/* Rute 2: Halaman Login */}
-        <Route path="/login" element={<LoginPage />} />
-        
-        {/* Rute 3: Halaman Daftar */}
-        <Route path="/signup" element={<SignUpPage />} />
-        
-        {/* Rute 4: Halaman Utama Dashboard AI */}
-        <Route path="/dashboard" element={<DashboardPage />} />
-      </Routes>
-    </BrowserRouter>
-  );
+  // State: 'login', 'signup', 'room', 'dashboard'
+  const [currentPage, setCurrentPage] = useState('login');
+
+  if (currentPage === 'login') return <LoginPage onLogin={() => setCurrentPage('room')} onGoToSignup={() => setCurrentPage('signup')} />;
+  if (currentPage === 'signup') return <SignUpPage onSignup={() => setCurrentPage('room')} onGoToLogin={() => setCurrentPage('login')} />;
+  if (currentPage === 'room') return <RoomSelectionPage onSelectRoom={() => setCurrentPage('dashboard')} />;
+  if (currentPage === 'dashboard') return <DashboardPage />;
 }
 
 export default App;
