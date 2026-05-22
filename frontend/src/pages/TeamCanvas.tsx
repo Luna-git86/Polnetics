@@ -20,8 +20,9 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
   // === STATE UNTUK LOG AKTIVITAS GIT ===
   const [aktivitasGit, setAktivitasGit] = useState<any[]>([]);
 
-  // === AMBIL DATA ANGGOTA DINAMIS & DENGARKAN PERUBAHAN SECARA REAL-TIME ===
+  // === AMBIL DATA & DENGARKAN PERUBAHAN SECARA REAL-TIME ===
   useEffect(() => {
+    // 1. Muat Data Workspace Aktif
     const dataWorkspaceRaw = localStorage.getItem('activeWorkspace');
     let workspaceIdAktif = null;
 
@@ -34,10 +35,16 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
       }
     }
 
-    // KONEKSI SOCKET UNTUK REAL-TIME UPDATE
+    // 2. Muat Riwayat Git Lama dari Local Storage (Agar tidak hilang saat di-refresh)
+    const riwayatGitTersimpan = localStorage.getItem('git_history');
+    if (riwayatGitTersimpan) {
+      setAktivitasGit(JSON.parse(riwayatGitTersimpan));
+    }
+
+    // 3. KONEKSI SOCKET UNTUK REAL-TIME UPDATE
     const socket = io('http://localhost:5000');
 
-    // 1. Mendengarkan Anggota Baru
+    // Mendengarkan Anggota Baru
     socket.on('workspace-updated', (updatedWorkspace: any) => {
       if (workspaceIdAktif && updatedWorkspace._id === workspaceIdAktif) {
         setMembers(updatedWorkspace.anggota);
@@ -45,9 +52,16 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
       }
     });
 
-    // 2. Mendengarkan Aktivitas Git (Push/Commit/Pull) dari Server
+    // Mendengarkan Aktivitas Git (Push/Commit/Pull)
     socket.on('git-activity', (aktivitasBaru: any) => {
-      setAktivitasGit((prev) => [aktivitasBaru, ...prev].slice(0, 5)); // Simpan 5 log terbaru saja
+      setAktivitasGit((prev) => {
+        const dataBaru = [aktivitasBaru, ...prev].slice(0, 5); // Simpan maksimal 5 log terbaru
+        
+        // Simpan ke brankas browser setiap ada log baru
+        localStorage.setItem('git_history', JSON.stringify(dataBaru));
+        
+        return dataBaru;
+      });
     });
 
     return () => {
@@ -205,8 +219,6 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
             </div>
           </div>
 
-          {/* Dihapus: Teks gimmick "CodeWorkZ AI is listening..." sesuai permintaan */}
-
           {pesanError && (
             <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium animate-in fade-in flex justify-between items-center">
               <span>{pesanError}</span>
@@ -340,7 +352,7 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
           </button>
         </div>
 
-        {/* Kotak Git Activities (Menggantikan Recent Updates) */}
+        {/* Kotak Git Activities */}
         <div className="bg-white rounded-[24px] p-6 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex-1 overflow-y-auto custom-scrollbar">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-[15px] font-semibold tracking-tight text-slate-900">Git Activities</h3>
