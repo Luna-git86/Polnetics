@@ -1,24 +1,12 @@
 {
-  "name": "backend",
+  "name": "backend-polnetics",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Dapur Backend Standup Canvas",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "start": "node server.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Luna-git86/Polnetics.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/Luna-git86/Polnetics/issues"
-  },
-  "homepage": "https://github.com/Luna-git86/Polnetics#readme",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^3.0.3",
@@ -26,7 +14,8 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.6.2"
+    "mongoose": "^9.6.2",
+    "simple-git": "^3.36.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
