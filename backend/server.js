@@ -1,9 +1,15 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const mongoose = require('mongoose'); // Tambahkan ini
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+//Sambungkan ke MongoDB menggunakan Mongoose
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('(MongoDB) berhasil tersambung!'))
+  .catch((err) => console.log('Gagal menyambung ke MongoDB:', err));
 
 // Middleware (Agar Frontend diizinkan ngobrol dengan Backend)
 app.use(cors());
