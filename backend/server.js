@@ -52,50 +52,57 @@ app.get('/', (req, res) => {
 // Jalur Menerima Laporan & Analisis AI
 app.post('/api/laporan', async (req, res) => {
     try {
-        // 1. Terima pesanan dari Ruang Makan (Frontend) - TANGKAP NAMA JUGA
-        const { nama, teksLaporan } = req.body;
-        console.log(`Menerima laporan dari ${nama}:`, teksLaporan);
+        // Tangkap workspaceId dari Frontend
+        const { nama, teksLaporan, workspaceId } = req.body;
+        
+        if (!workspaceId) {
+            return res.status(400).json({ status: "gagal", pesan: "Workspace ID tidak ditemukan!" });
+        }
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
         const prompt = `
-            Kamu adalah AI Scrum Master dan Technical Agile Coach. Baca laporan harian (daily standup) dari seorang programmer ini: "${teksLaporan}"
-            Tugasmu adalah mendekonstruksi teks tersebut ke dalam metrik Agile. Pahami jargon teknis seperti API, Bug, Deploy, PR, dll.
-            PENTING: Kamu HANYA boleh membalas dengan format JSON murni persis seperti struktur di bawah ini tanpa teks pengantar:
+            Kamu adalah AI Scrum Master. Baca laporan harian ini: "${teksLaporan}"
+            Balas dengan format JSON murni persis seperti ini:
             {
-                "pastProgress": { "status": "done atau in-progress", "deskripsi": "Fitur/kode apa yang dikerjakan sebelumnya" },
-                "currentTarget": { "status": "in-progress", "deskripsi": "Fitur/kode apa yang akan dikerjakan hari ini" },
-                "blocker": { "hasBlocker": true/false, "to": "Nama role/orang yang ditunggu (misal: DevOps, Zidan, dll)", "reason": "Alasan hambatan teknis" },
-                "metrics": {
-                    "velocity": angka_1_sampai_100,
-                    "fatigue": angka_1_sampai_100,
-                    "motivation": angka_1_sampai_100
-                }
+                "pastProgress": { "status": "done", "deskripsi": "..." },
+                "currentTarget": { "status": "in-progress", "deskripsi": "..." },
+                "blocker": { "hasBlocker": true/false, "to": "...", "reason": "..." },
+                "metrics": { "velocity": 80, "fatigue": 20, "motivation": 90 }
             }
         `;
         
         const result = await model.generateContent(prompt);
         let responseText = result.response.text();
-        
         responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
         const hasilAI = JSON.parse(responseText); 
 
-       // 3. Simpan ke Buku Kasir (MongoDB) - MASUKKAN NAMA
         const laporanBaru = new Laporan({
-            nama: nama || "Anonim", // Jika lupa kirim nama, isi dengan "Anonim"
+            nama: nama || "Anonim",
             teksAsli: teksLaporan,
-            hasilAI: hasilAI
+            hasilAI: hasilAI,
+            workspaceId: workspaceId // Simpan ke proyek spesifik
         });
         await laporanBaru.save();
 
-        res.json({
-            status: "sukses",
-            pesan: "Laporan berhasil dianalisis!",
-            data: laporanBaru
-        });
+        io.emit('laporan-baru', laporanBaru);
 
+        res.json({ status: "sukses", pesan: "Laporan berhasil dianalisis!", data: laporanBaru });
     } catch (error) {
         console.error("Dapur sedang kacau:", error);
         res.status(500).json({ status: "gagal", pesan: "Terjadi kesalahan di server." });
+    }
+});
+
+// JALUR GET: Mengambil Laporan berdasarkan Workspace ID
+app.get('/api/laporan/:workspaceId', async (req, res) => {
+    try {
+        const { workspaceId } = req.params;
+        // Hanya cari laporan yang cocok dengan ID proyek
+        const semuaLaporan = await Laporan.find({ workspaceId: workspaceId }).sort({ tanggalPembuatan: -1 });
+        
+        res.json({ status: "sukses", data: semuaLaporan });
+    } catch (error) {
+        res.status(500).json({ status: "gagal", pesan: "Terjadi kesalahan saat mengambil data." });
     }
 });
 
@@ -137,28 +144,37 @@ app.post('/api/login', async (req, res) => {
         const passwordCocok = await bcrypt.compare(password, user.password);
         if (!passwordCocok) return res.status(400).json({ status: "gagal", pesan: "Password salah!" });
 
-        // PENTING: Masukkan data 'role' ke dalam Token JWT agar aman dan tidak bisa dimanipulasi
         const token = jwt.sign(
             { id: user._id, nama: user.nama, role: user.role }, 
             'kunci_rahasia_polnetics', 
             { expiresIn: '1d' }
         );
 
+        // --- TAMBAHAN LOGIKA: CARI WORKSPACE USER ---
+        const Workspace = require('./models/Workspace'); // Pastikan model dipanggil
+        // Cari workspace pertama di mana user ini terdaftar sebagai anggota
+        const workspaceUser = await Workspace.findOne({ "anggota.user": user._id });
+
         res.json({ 
             status: "sukses", 
             pesan: "Login berhasil!", 
             token: token,
             dataUser: { 
+                _id: user._id, 
                 nama: user.nama, 
                 email: user.email,
-                role: user.role // Berikan data role ke frontend untuk atur tampilan layar
-            }
+                role: user.role 
+            },
+            // Kirim data workspace ke frontend (akan null jika belum punya)
+            workspaceAktif: workspaceUser 
         });
     } catch (error) {
         console.error(error);
         res.status(500).json({ status: "gagal", pesan: "Error di server" });
     }
 });
+
+const Workspace = require('./models/Workspace');    
 
 // Jalur untuk Mengambil Semua Laporan (Untuk Dashboard Frontend)
 // Jalur Mengambil Semua Laporan
@@ -279,6 +295,83 @@ app.post('/api/webhook', async (req, res) => {
         res.status(200).send("Webhook berhasil dieksekusi");
     } catch (error) {
         res.status(500).send("Gagal eksekusi webhook");
+    }
+});
+
+// 1. BUAT WORKSPACE BARU (Otomatis jadi 'Owner')
+app.post('/api/workspace/create', async (req, res) => {
+    try {
+        const { namaWorkspace, userId, namaUser } = req.body;
+        
+        // Buat kode unik 6 huruf acak untuk invite member
+        const kodeJoin = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+        const workspaceBaru = new Workspace({
+            namaWorkspace,
+            kodeJoin,
+            pembuat: userId,
+            anggota: [{ user: userId, nama: namaUser, role: 'Owner' }] // Pembuat otomatis jadi bos
+        });
+
+        await workspaceBaru.save();
+        res.json({ status: "sukses", pesan: "Workspace berhasil dibuat!", data: workspaceBaru });
+    } catch (error) {
+        res.status(500).json({ status: "gagal", pesan: error.message });
+    }
+});
+
+// 2. GABUNG WORKSPACE (Otomatis jadi 'Member')
+app.post('/api/workspace/join', async (req, res) => {
+    try {
+        const { kodeJoin, userId, namaUser } = req.body;
+
+        const workspace = await Workspace.findOne({ kodeJoin });
+        if (!workspace) return res.status(404).json({ status: "gagal", pesan: "Kode Workspace tidak ditemukan!" });
+
+        // Cek apakah user sudah ada di dalam workspace
+        const sudahGabung = workspace.anggota.find(m => m.user.toString() === userId);
+        if (sudahGabung) return res.status(400).json({ status: "gagal", pesan: "Kamu sudah berada di Workspace ini." });
+
+        // Masukkan user baru sebagai 'Member'
+        workspace.anggota.push({ user: userId, nama: namaUser, role: 'Member' });
+        await workspace.save();
+
+        res.json({ status: "sukses", pesan: `Berhasil bergabung ke ${workspace.namaWorkspace}`, data: workspace });
+    } catch (error) {
+        res.status(500).json({ status: "gagal", pesan: error.message });
+    }
+});
+
+// 3. UBAH ROLE MEMBER (Hanya bisa dilakukan oleh Owner/Admin)
+app.put('/api/workspace/role', async (req, res) => {
+    try {
+        const { workspaceId, requesterId, targetUserId, roleBaru } = req.body;
+
+        const workspace = await Workspace.findById(workspaceId);
+        if (!workspace) return res.status(404).json({ status: "gagal", pesan: "Workspace tidak ditemukan!" });
+
+        // Cari siapa yang me-request perubahan ini (Apakah dia Owner/Admin?)
+        const requester = workspace.anggota.find(m => m.user.toString() === requesterId);
+        if (!requester || (requester.role !== 'Owner' && requester.role !== 'Admin')) {
+            return res.status(403).json({ status: "gagal", pesan: "Akses Ditolak! Hanya Owner atau Admin yang bisa mengubah Role." });
+        }
+
+        // Cari member yang rolenya mau diubah
+        const targetUser = workspace.anggota.find(m => m.user.toString() === targetUserId);
+        if (!targetUser) return res.status(404).json({ status: "gagal", pesan: "Member tidak ditemukan di Workspace ini." });
+
+        // Cegah Admin mengubah role Owner
+        if (targetUser.role === 'Owner' && requester.role === 'Admin') {
+            return res.status(403).json({ status: "gagal", pesan: "Admin tidak bisa mengubah jabatan Owner!" });
+        }
+
+        // Ubah rolenya dan simpan
+        targetUser.role = roleBaru;
+        await workspace.save();
+
+        res.json({ status: "sukses", pesan: `Role ${targetUser.nama} berhasil diubah menjadi ${roleBaru}!`, data: workspace });
+    } catch (error) {
+        res.status(500).json({ status: "gagal", pesan: error.message });
     }
 });
 

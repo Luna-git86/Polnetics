@@ -1,197 +1,241 @@
-import { useEffect, useState } from 'react';
-import { CheckCircle2, AlertTriangle, Activity, ChevronRight, Zap, Lightbulb, Clock } from 'lucide-react';
+import { useState, useEffect } from "react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} from "recharts";
+import { Zap, AlertTriangle, TrendingUp, Activity, CheckCircle2, CircleDashed, Clock} from "lucide-react";
 
 const TeamAnalytics = () => {
-  // === STATE APLIKASI ===
-  const [semuaLaporan, setSemuaLaporan] = useState<any[]>([]);
-  const [anggotaKesusahan, setAnggotaKesusahan] = useState<any[]>([]);
-  const [anggotaSelesai, setAnggotaSelesai] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [dataGrafik, setDataGrafik] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [riskSummary, setRiskSummary] = useState({ fatigue: 0, velocity: 0, motivation: 0, hasBlocker: false });
+  const [activeTasks, setActiveTasks] = useState<any[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<any[]>([]);
 
-  // === FUNGSI MENYEDOT DATA DARI SERVER.JS ===
   useEffect(() => {
-    const fetchLaporan = async () => {
+    const ambilDataLaporan = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/laporan');
-        const result = await response.json();
+        const idWorkspaceAktif = localStorage.getItem('activeWorkspace');
         
-        if (result.data) {
-          const dataAsli = result.data.reverse(); // Yang terbaru di atas
-          setSemuaLaporan(dataAsli);
+        // Saring data laporan murni untuk ruang kerja/workspace yang sedang dibuka saja
+        const url = idWorkspaceAktif 
+          ? `http://localhost:5000/api/laporan?workspaceId=${idWorkspaceAktif}`
+          : "http://localhost:5000/api/laporan";
 
-          // === LOGIKA AI SEDERHANA (PENYORTIRAN OTOMATIS) ===
-          // Memisahkan siapa yang "Stuck/Kesusahan" dan siapa yang "Aman/Selesai"
-          // Berdasarkan kata kunci pada teks laporan atau hasil analisis AI
-          const butuhBantuan = dataAsli.filter((lap: any) => 
-            lap.teksLaporan.toLowerCase().match(/kendala|error|bug|susah|hambatan|gagal|stuck/i) || 
-            (lap.hasilAnalisis && lap.hasilAnalisis.toLowerCase().match(/risiko tinggi|bantu/i))
-          );
+        const response = await fetch(url);
+        const hasil = await response.json();
 
-          const sudahSelesai = dataAsli.filter((lap: any) => 
-            lap.teksLaporan.toLowerCase().match(/selesai|berhasil|aman|done|sukses|lancar/i) &&
-            !butuhBantuan.includes(lap) // Pastikan tidak masuk daftar kesusahan
-          );
+        if (response.ok && hasil.data && hasil.data.length > 0) {
+          // 1. FORMAT DATA GRAFIK ANALISIS RISIKO
+          const formatDataGrafik = hasil.data.map((item: any, indeks: number) => ({
+            name: item.nama || `Tim ${indeks + 1}`,
+            velocity: item.hasilAI?.metrics?.velocity || 50,
+            fatigue: item.hasilAI?.metrics?.fatigue || 30,
+            motivation: item.hasilAI?.metrics?.motivation || 70,
+          })).reverse();
+          setDataGrafik(formatDataGrafik);
 
-          setAnggotaKesusahan(butuhBantuan);
-          setAnggotaSelesai(sudahSelesai);
+          // 2. SET KARTU RINGKASAN EVALUASI AI
+          const laporanTerakhir = hasil.data[0];
+          setRiskSummary({
+            fatigue: laporanTerakhir.hasilAI?.metrics?.fatigue || 0,
+            velocity: laporanTerakhir.hasilAI?.metrics?.velocity || 0,
+            motivation: laporanTerakhir.hasilAI?.metrics?.motivation || 0,
+            hasBlocker: laporanTerakhir.hasilAI?.blocker?.hasBlocker || false
+          });
+
+          // 3. LOGIKA MAGIC SPRINT BOARD (Intent-Based UI)
+          const aktif: any[] = [];
+          const selesai: any[] = [];
+
+          hasil.data.forEach((item: any) => {
+            const ai = item.hasilAI;
+            if (!ai) return;
+
+            // Jika AI mendeteksi ada pekerjaan masa lalu yang berstatus "done"
+            if (ai.pastProgress?.deskripsi && ai.pastProgress.deskripsi.toLowerCase() !== "tidak ada") {
+              selesai.push({
+                id: `${item._id}-done`,
+                nama: item.nama || "Anonim",
+                role: item.role || "developer", // Menangkap peran divisi seperti backend/frontend
+                deskripsi: ai.pastProgress.deskripsi,
+                tanggal: item.tanggalPembuatan ? new Date(item.tanggalPembuatan).toLocaleDateString('id-ID') : "Baru saja"
+              });
+            }
+
+            // Jika AI mendeteksi ada inisiasi tugas baru/target hari ini dari ucapan pemimpin/member
+            if (ai.currentTarget?.deskripsi && ai.currentTarget.deskripsi.toLowerCase() !== "tidak ada") {
+              aktif.push({
+                id: `${item._id}-active`,
+                nama: item.nama || "Anonim",
+                role: item.role || "developer",
+                deskripsi: ai.currentTarget.deskripsi,
+                tanggal: item.tanggalPembuatan ? new Date(item.tanggalPembuatan).toLocaleDateString('id-ID') : "Hari ini"
+              });
+            }
+          });
+
+          setActiveTasks(aktif);
+          setCompletedTasks(selesai);
         }
       } catch (error) {
-        console.error("Gagal terhubung ke database:", error);
+        console.error("Gagal memuat sistem analitik papan:", error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    fetchLaporan();
+    ambilDataLaporan();
   }, []);
 
+  if (loading) {
+    return <div className="flex h-64 items-center justify-center text-sm font-medium text-slate-500">Menghubungkan ke AI Engine Proyek... ⏳</div>;
+  }
+
   return (
-    <div className="animate-in fade-in duration-300 font-sans pb-10">
+    <div className="space-y-8 animate-fade-in pb-10">
       
-      {/* --- HEADER --- */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-[#0071E3]">
-            <Activity size={24} />
+      {/* Barisan Kartu Metrik Resiko */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-xs">
+          <div className="flex justify-between items-start">
+            <span className="text-sm font-medium text-slate-500">Burnout Risk (Fatigue)</span>
+            <div className={`p-2 rounded-lg ${riskSummary.fatigue > 60 ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-600'}`}>
+              <Activity size={16} />
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">AI Team Analytics</h1>
-            <p className="text-sm text-slate-500">Live monitoring dari Sync Canva AI</p>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-slate-900">{riskSummary.fatigue}%</span>
+            <span className={`text-xs font-semibold ${riskSummary.fatigue > 60 ? 'text-red-600' : 'text-green-600'}`}>
+              {riskSummary.fatigue > 60 ? "⚠️ Risiko Tinggi" : "✓ Aman"}
+            </span>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-full text-sm font-semibold text-slate-600 shadow-sm">
-          <Clock size={16} className="text-[#0071E3]" />
-          Update Real-time
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-xs">
+          <div className="flex justify-between items-start">
+            <span className="text-sm font-medium text-slate-500">Team Velocity</span>
+            <div className="p-2 rounded-lg bg-cyan-50 text-[#0071E3]">
+              <TrendingUp size={16} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-slate-900">{riskSummary.velocity} pts</span>
+            <span className="text-xs text-slate-500 font-medium">Produktifitas</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-xs">
+          <div className="flex justify-between items-start">
+            <span className="text-sm font-medium text-slate-500">Blocker Status</span>
+            <div className={`p-2 rounded-lg ${riskSummary.hasBlocker ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600'}`}>
+              <AlertTriangle size={16} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-slate-900">
+              {riskSummary.hasBlocker ? "Ada Hambatan" : "Lancar Jaya"}
+            </span>
+          </div>
         </div>
       </div>
 
-      {isLoading ? (
-        // --- LOADING STATE ---
-        <div className="flex flex-col items-center justify-center h-64 bg-white rounded-3xl border border-slate-100 shadow-sm">
-          <Zap className="animate-pulse text-[#0071E3] mb-3" size={32} />
-          <p className="text-slate-500 font-medium text-sm">AI sedang membaca database tim...</p>
+      {/* Panel Grafik Tren */}
+      <div className="bg-white p-8 rounded-2xl border border-slate-200/60 shadow-xs">
+        <div className="mb-6">
+          <h3 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
+            <Zap size={18} className="text-[#0071E3] fill-[#0071E3]" />
+            AI Agile Risk Analytics
+          </h3>
+          <p className="text-slate-500 text-xs mt-1">Grafik dekonstruksi metrik kelelahan dan produktifitas tim.</p>
         </div>
-      ) : (
-        <>
-          {/* --- AI INSIGHT WIDGET (Rekomendasi Cerdas) --- */}
-          <div className="bg-gradient-to-r from-[#0071E3] to-[#005bb5] rounded-3xl p-6 mb-8 text-white shadow-lg relative overflow-hidden">
-            <Zap className="absolute right-[-20px] top-[-20px] w-48 h-48 text-white opacity-10" />
-            <div className="flex items-start gap-4 relative z-10">
-              <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm">
-                <Lightbulb size={28} className="text-white" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold mb-1">AI Executive Summary</h2>
-                <p className="text-blue-100 text-sm leading-relaxed max-w-3xl">
-                  {anggotaKesusahan.length > 0 
-                    ? `Ada ${anggotaKesusahan.length} anggota tim yang sedang menghadapi hambatan. Segera koordinasikan bantuan untuk menjaga produktivitas Sprint hari ini.` 
-                    : `Luar biasa! Tidak ada anggota tim yang melaporkan hambatan kritis hari ini. ${anggotaSelesai.length} tugas berhasil diselesaikan dengan baik.`}
-                </p>
-              </div>
-            </div>
+        <div className="h-[320px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={dataGrafik} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} />
+              <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} domain={[0, 100]} />
+              <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px' }} />
+              <Legend verticalAlign="top" height={36} iconType="circle" />
+              <Line type="monotone" dataKey="velocity" stroke="#0071E3" strokeWidth={3} name="Kecepatan" />
+              <Line type="monotone" dataKey="fatigue" stroke="#FF3B30" strokeWidth={3} name="Risiko Burnout" />
+              <Line type="monotone" dataKey="motivation" stroke="#34C759" strokeWidth={2} strokeDasharray="4 4" name="Motivasi" />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Papan Kanban Otomatis Intent-Based UI */}
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">Magic Sprint Board</h3>
+            <p className="text-slate-500 text-sm mt-1">Sistem papan manajemen tugas ter-update otomatis murni dari ucapan lisan tim.</p>
           </div>
+          <span className="px-3 py-1 bg-[#0071E3]/10 text-[#0071E3] text-[10px] font-bold uppercase tracking-widest rounded-full flex items-center gap-1.5">
+            <Zap size={12} className="fill-[#0071E3]"/> AI Orkestrasi
+          </span>
+        </div>
 
-          {/* --- GRID HIGHLIGHT (Kesusahan vs Selesai) --- */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            
-            {/* KOTAK MERAH: Butuh Bantuan */}
-            <div className="bg-white border border-red-100 rounded-3xl p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <AlertTriangle size={20} className="text-red-500" />
-                <h2 className="text-base font-bold text-slate-800">Needs Attention (Blocked)</h2>
-                <span className="ml-auto bg-red-100 text-red-600 px-2.5 py-0.5 rounded-full text-xs font-bold">
-                  {anggotaKesusahan.length} Anggota
-                </span>
-              </div>
-              
-              <div className="space-y-3">
-                {anggotaKesusahan.length === 0 ? (
-                  <p className="text-sm text-slate-400 italic">Semua anggota aman, tidak ada kendala.</p>
-                ) : (
-                  anggotaKesusahan.map((lap, i) => (
-                    <div key={i} className="p-3 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-red-200 text-red-700 flex items-center justify-center text-xs font-bold shrink-0">
-                        {lap.nama?.substring(0,2).toUpperCase() || 'AI'}
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800">{lap.nama}</h4>
-                        <p className="text-xs text-red-600 mt-0.5 line-clamp-2">{lap.teksLaporan}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* KOTAK HIJAU: Sudah Selesai */}
-            <div className="bg-white border border-emerald-100 rounded-3xl p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle2 size={20} className="text-[#34C759]" />
-                <h2 className="text-base font-bold text-slate-800">Completed (On Track)</h2>
-                <span className="ml-auto bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full text-xs font-bold">
-                  {anggotaSelesai.length} Tugas
-                </span>
-              </div>
-              
-              <div className="space-y-3">
-                {anggotaSelesai.length === 0 ? (
-                  <p className="text-sm text-slate-400 italic">Belum ada tugas yang dilaporkan selesai.</p>
-                ) : (
-                  anggotaSelesai.map((lap, i) => (
-                    <div key={i} className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center text-xs font-bold shrink-0">
-                        {lap.nama?.substring(0,2).toUpperCase() || 'AI'}
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800">{lap.nama}</h4>
-                        <p className="text-xs text-emerald-700 mt-0.5 line-clamp-2">{lap.teksLaporan}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-          </div>
-
-          {/* --- LOG LAPORAN LENGKAP --- */}
-          <h2 className="text-lg font-bold text-slate-800 mb-4">Semua Log Laporan Hari Ini</h2>
-          <div className="bg-white border border-slate-200 rounded-3xl p-2 shadow-sm">
-            {semuaLaporan.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-sm">Data laporan kosong.</div>
-            ) : (
-              semuaLaporan.map((laporan, index) => (
-                <div key={index} className="group flex items-start justify-between p-4 hover:bg-[#F5F5F7] rounded-2xl transition-colors cursor-pointer border-b border-slate-50 last:border-0">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold bg-slate-100 text-slate-600 border border-slate-200 shrink-0 mt-1">
-                      {laporan.nama ? laporan.nama.substring(0, 2).toUpperCase() : 'AI'}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="text-sm font-bold text-slate-800">{laporan.nama}</h4>
-                        <span className="text-[11px] text-slate-400">
-                          {laporan.createdAt ? new Date(laporan.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Hari ini'}
-                        </span>
-                      </div>
-                      <p className="text-[13px] text-slate-600 leading-relaxed max-w-3xl mb-2">{laporan.teksLaporan}</p>
-                      
-                      {laporan.hasilAnalisis && (
-                        <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-xl inline-block mt-1">
-                          <p className="text-[12px] text-slate-700 leading-relaxed flex items-start gap-2">
-                            <Zap size={14} className="text-[#0071E3] shrink-0 mt-0.5" />
-                            <span><span className="font-bold text-[#0071E3]">Analisis AI:</span> {laporan.hasilAnalisis.replace('(DUMMY MODE)', '').trim()}</span>
-                          </p>
-                        </div>
-                      )}
-                    </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* Kolom 1: Active Tasks (Target Hari Ini) */}
+          <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-200/60">
+            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-4">
+              <CircleDashed size={16} className="text-[#0071E3]" />
+              Target Hari Ini (Active Sprint)
+            </h4>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+              {activeTasks.length > 0 ? activeTasks.map((task) => (
+                <div key={task.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-[#0071E3]/30 transition-colors">
+                  <p className="text-sm font-medium text-slate-800 leading-snug">{task.deskripsi}</p>
+                  <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      {/* Pelindung Crash Aman: Dipastikan nama aman dari crash charAt */}
+                      <div className="w-5 h-5 bg-slate-100 rounded-full flex items-center justify-center text-[9px] text-[#0071E3] border border-slate-200 font-bold">
+                        {(task.nama || "A").charAt(0).toUpperCase()}
+                      </div> 
+                      <span className="text-slate-700">{task.nama}</span>
+                      <span className="text-slate-400 text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-mono uppercase">({task.role})</span>
+                    </span>
+                    <span className="flex items-center gap-1"><Clock size={10} /> {task.tanggal}</span>
                   </div>
-                  <ChevronRight size={16} className="text-slate-300 group-hover:text-[#0071E3] mt-2 transition-colors" />
                 </div>
-              ))
-            )}
+              )) : (
+                <p className="text-xs text-slate-400 text-center py-10">Belum ada target penugasan linguistik aktif.</p>
+              )}
+            </div>
           </div>
-        </>
-      )}
+
+          {/* Kolom 2: Completed Tasks (Tugas Selesai) */}
+          <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-200/60">
+            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-4">
+              <CheckCircle2 size={16} className="text-[#34C759]" />
+              Selesai Dikerjakan (Done)
+            </h4>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+              {completedTasks.length > 0 ? completedTasks.map((task) => (
+                <div key={task.id} className="bg-white p-4 rounded-xl border border-green-100 shadow-xs relative overflow-hidden">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#34C759]"></div>
+                  <p className="text-sm font-medium text-slate-500 leading-snug line-through opacity-70">{task.deskripsi}</p>
+                  <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <div className="w-5 h-5 bg-green-50 rounded-full flex items-center justify-center text-[9px] text-[#34C759] border border-green-100 font-bold">
+                        {(task.nama || "A").charAt(0).toUpperCase()}
+                      </div> 
+                      <span className="text-slate-600">{task.nama}</span>
+                      <span className="text-slate-400 text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-mono uppercase">({task.role})</span>
+                    </span>
+                    <span className="flex items-center gap-1 text-[#34C759] bg-green-50 px-2 py-0.5 rounded-full text-[10px] font-bold"><CheckCircle2 size={10} /> Selesai</span>
+                  </div>
+                </div>
+              )) : (
+                <p className="text-xs text-slate-400 text-center py-10">Belum ada pencapaian tugas yang terekstraksi.</p>
+              )}
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 };
