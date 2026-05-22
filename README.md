@@ -1,0 +1,2 @@
+# Polnetics
+Hackathon UMKT
