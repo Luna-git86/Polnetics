@@ -1,94 +1,77 @@
 import { useState } from 'react';
-import { Mail, Lock, EyeOff, ArrowRight, Zap } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Zap } from 'lucide-react';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#020617] text-white font-sans selection:bg-cyan-500/30">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#F5F5F7] text-slate-900 font-sans selection:bg-[#0071E3]/20">
       
-      {/* Background Glow Effect */}
-      {/* Mengubah w-[500px] menjadi w-125 dan menghapus minus pada z-0 */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-125 h-125 bg-blue-600/10 blur-[120px] rounded-full z-0"></div>
-
-      {/* Logo Area */}
-      <div className="flex items-center gap-2 mb-8 z-10">
-        {/* Mengubah bg-gradient menjadi bg-linear (Tailwind v4) */}
-        <div className="p-2 bg-linear-to-br from-cyan-400 to-blue-600 rounded-lg shadow-[0_0_15px_rgba(34,211,238,0.4)]">
-          <Zap size={24} className="fill-white text-white" />
-        </div>
-        {/* Menghapus tracking-tight yang bertabrakan dengan tracking-widest */}
-        <h1 className="text-2xl font-bold text-slate-200 uppercase tracking-widest">
-          CodeWorkZ
-        </h1>
-      </div>
-
-      {/* Login Card */}
-      {/* Mengubah max-w-[400px] menjadi max-w-100 */}
-      <div className="w-full max-w-100 p-10 bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 rounded-[40px] shadow-2xl z-10 relative">
+      {/* Area Form Login */}
+      <div className="w-full max-w-[420px] p-10 bg-white border border-black/[0.04] rounded-[32px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] z-10">
         
-        <div className="text-center mb-10">
-          <h2 className="text-3xl font-semibold text-slate-100 mb-2">Welcome Back</h2>
-          <p className="text-slate-400 text-sm">Sign in to continue to your dashboard</p>
+        {/* Logo & Judul */}
+        <div className="flex flex-col items-center text-center mb-10">
+          <div className="w-12 h-12 bg-gradient-to-b from-slate-50 to-slate-100 border border-slate-200/60 rounded-2xl flex items-center justify-center shadow-sm mb-5">
+            <Zap size={24} className="text-[#0071E3] fill-[#0071E3]/20" />
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 mb-2">Masuk ke CodeWorkZ</h1>
+          <p className="text-[13px] text-slate-500 font-medium">Lanjutkan ke workspace tim Anda</p>
         </div>
 
-        <form className="space-y-6">
-          {/* Email Input */}
-          <div className="relative group">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors" size={20} />
+        <form className="space-y-4">
+          {/* Input Email */}
+          <div className="relative">
+            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="email"
-              placeholder="Email Address"
-              className="w-full bg-[#0f172a]/80 border border-slate-700 py-4 pl-12 pr-4 rounded-2xl outline-none focus:border-cyan-500/50 focus:ring-4 focus:ring-cyan-500/10 transition-all text-slate-200 placeholder:text-slate-600"
+              placeholder="Alamat Email"
+              className="w-full bg-[#F5F5F7] border border-transparent focus:border-slate-300 focus:bg-white py-3.5 pl-11 pr-4 rounded-[16px] outline-none transition-all text-[14px] font-medium text-slate-900 placeholder:text-slate-400"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
-          {/* Password Input */}
-          <div className="relative group">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-cyan-400 transition-colors" size={20} />
+          {/* Input Password */}
+          <div className="relative">
+            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="password"
-              placeholder="Password"
-              className="w-full bg-[#0f172a]/80 border border-slate-700 py-4 pl-12 pr-12 rounded-2xl outline-none focus:border-cyan-500/50 focus:ring-4 focus:ring-cyan-500/10 transition-all text-slate-200 placeholder:text-slate-600"
+              placeholder="Kata Sandi"
+              className="w-full bg-[#F5F5F7] border border-transparent focus:border-slate-300 focus:bg-white py-3.5 pl-11 pr-4 rounded-[16px] outline-none transition-all text-[14px] font-medium text-slate-900 placeholder:text-slate-400"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-            <EyeOff className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 cursor-pointer hover:text-slate-400" size={18} />
           </div>
 
-          {/* Remember Me */}
-          <div className="flex items-center gap-2 px-1">
-            <input 
-              type="checkbox" 
-              id="remember" 
-              className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-cyan-500/20 outline-none cursor-pointer"
-            />
-            <label htmlFor="remember" className="text-sm text-slate-400 cursor-pointer select-none">
-              Remember me
+          <div className="flex justify-between items-center px-1 pt-2 pb-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" className="w-4 h-4 rounded-md border-slate-300 text-[#0071E3] focus:ring-[#0071E3]" />
+              <span className="text-[13px] font-medium text-slate-500">Ingat saya</span>
             </label>
+            <a href="#" className="text-[13px] font-semibold text-[#0071E3] hover:underline">Lupa sandi?</a>
           </div>
 
-          {/* Submit Button */}
+          {/* Tombol Login */}
           <button
             type="submit"
-            className="w-full py-4 bg-linear-to-r from-cyan-500 to-blue-600 rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] active:scale-[0.98] transition-all group"
+            className="w-full py-3.5 bg-[#0071E3] text-white rounded-[16px] font-semibold text-[14px] flex items-center justify-center gap-2 shadow-sm hover:bg-[#005bb5] hover:shadow-md transition-all group"
           >
-            Sign In
-            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+            Masuk Sekarang
+            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
           </button>
         </form>
 
-        {/* Footer */}
-        <div className="mt-8 text-center">
-          <p className="text-sm text-slate-500">
-            Don't have an account?{' '}
-            <a href="#" className="text-cyan-400 hover:text-cyan-300 transition-colors font-medium">Sign up</a>
-          </p>
-        </div>
+        <p className="text-center text-[13px] font-medium text-slate-500 mt-8">
+          Belum punya akun? <a href="#" className="text-[#0071E3] font-semibold hover:underline">Daftar gratis</a>
+        </p>
       </div>
+
+      {/* Footer minimalis */}
+      <p className="mt-10 text-[12px] font-medium text-slate-400">
+        &copy; 2026 CodeWorkZ Inc. All rights reserved.
+      </p>
     </div>
   );
 };
