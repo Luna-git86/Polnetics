@@ -69,6 +69,22 @@ app.post('/api/laporan', async (req, res) => {
     }
 });
 
+// Jalur untuk Mengambil Semua Laporan (Untuk Dashboard Frontend)
+app.get('/api/laporan', async (req, res) => {
+    try {
+        // Mengambil semua data dari database, diurutkan dari yang paling baru (-1)
+        const semuaLaporan = await Laporan.find().sort({ tanggalPembuatan: -1 });
+        
+        res.json({
+            status: "sukses",
+            pesan: "Berhasil mengambil data laporan",
+            data: semuaLaporan
+        });
+    } catch (error) {
+        console.error("Gagal mengambil data:", error);
+        res.status(500).json({ status: "gagal", pesan: "Terjadi kesalahan saat mengambil data." });
+    }
+});
 app.listen(PORT, () => {
     console.log(`Server berjalan di http://localhost:${PORT}`);
 });
