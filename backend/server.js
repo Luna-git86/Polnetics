@@ -120,11 +120,11 @@ app.post('/api/git/commit', async (req, res) => {
         await git.add('./*'); 
         const hasilCommit = await git.commit(pesanCommit);
 
-        // INI PENGERAS SUARANYA:
-        io.emit('notif-workspace', {
-            judul: "Pembaruan Disimpan! 📝",
-            pesan: `Ada yang baru saja melakukan Commit: "${pesanCommit}"`
-        });
+    // INI PENGERAS SUARANYA:
+    io.emit('notif-workspace', {
+        judul: "Pembaruan Disimpan! 📝",
+        pesan: `Ada yang baru saja melakukan Commit: "${pesanCommit}"`
+    });
 
         res.json({
             status: "sukses",
@@ -144,7 +144,8 @@ app.post('/api/git/push', async (req, res) => {
         const branchTujuan = branch || 'main';
 
         console.log(`Menjalankan git push ke branch ${branchTujuan}...`);
-        await git.push('origin', branchTujuan);
+        // ... kode git.push
+await git.push('origin', branchTujuan);
 
 // INI PENGERAS SUARANYA:
 io.emit('notif-workspace', {
@@ -168,6 +169,12 @@ app.post('/api/git/pull', async (req, res) => {
         console.log("Menjalankan git pull...");
         const hasilPull = await git.pull();
 
+        // INI PENGERAS SUARANYA:
+        io.emit('notif-workspace', {
+            judul: "Sinkronisasi Berhasil! 🔄",
+            pesan: "Data terbaru telah ditarik (pull) ke dalam Workspace."
+        });
+
         res.json({
             status: "sukses",
             pesan: "Berhasil menarik data terbaru (pull) dari GitHub!",
@@ -178,6 +185,7 @@ app.post('/api/git/pull', async (req, res) => {
         res.status(500).json({ status: "gagal", pesan: "Gagal pull: " + error.message });
     }
 });
+
 
 // ==========================================
 // FITUR 3: WEBHOOK (OTOMATISASI GITHUB)
