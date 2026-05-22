@@ -9,20 +9,24 @@ const LoginPage = () => {
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#020617] text-white font-sans selection:bg-cyan-500/30">
       
       {/* Background Glow Effect */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-`125` h-`500` bg-blue-600/10 blur-[120px] rounded-full `-z-0`"></div>
+      {/* Mengubah w-[500px] menjadi w-125 dan menghapus minus pada z-0 */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-125 h-125 bg-blue-600/10 blur-[120px] rounded-full z-0"></div>
 
       {/* Logo Area */}
       <div className="flex items-center gap-2 mb-8 z-10">
-        <div className="p-2 `bg-gradient-to-br` from-cyan-400 to-blue-600 rounded-lg shadow-[0_0_15px_rgba(34,211,238,0.4)]">
+        {/* Mengubah bg-gradient menjadi bg-linear (Tailwind v4) */}
+        <div className="p-2 bg-linear-to-br from-cyan-400 to-blue-600 rounded-lg shadow-[0_0_15px_rgba(34,211,238,0.4)]">
           <Zap size={24} className="fill-white text-white" />
         </div>
-        <h1 className="text-2xl font-bold `tracking-tight` text-slate-200 uppercase tracking-widest">
+        {/* Menghapus tracking-tight yang bertabrakan dengan tracking-widest */}
+        <h1 className="text-2xl font-bold text-slate-200 uppercase tracking-widest">
           CodeWorkZ
         </h1>
       </div>
 
       {/* Login Card */}
-      <div className="w-full `max-w-[400px]` p-10 bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 rounded-[40px] shadow-2xl z-10 relative">
+      {/* Mengubah max-w-[400px] menjadi max-w-100 */}
+      <div className="w-full max-w-100 p-10 bg-slate-900/40 backdrop-blur-xl border border-slate-700/50 rounded-[40px] shadow-2xl z-10 relative">
         
         <div className="text-center mb-10">
           <h2 className="text-3xl font-semibold text-slate-100 mb-2">Welcome Back</h2>
@@ -70,7 +74,7 @@ const LoginPage = () => {
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full py-4 `bg-gradient-to-r` from-cyan-500 to-blue-600 rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] active:scale-[0.98] transition-all group"
+            className="w-full py-4 bg-linear-to-r from-cyan-500 to-blue-600 rounded-2xl font-bold flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] active:scale-[0.98] transition-all group"
           >
             Sign In
             <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />

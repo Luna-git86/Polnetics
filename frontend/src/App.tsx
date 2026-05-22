@@ -1,11 +1,8 @@
-// Import halaman yang baru saja dibuat
-import LoginPage from './pages/LoginPage';
-import './index.css'
-
+import DashboardPage from './pages/DashboardPage';
+import SignUpPage from './pages/SignUpPage';
 function App() {
   return (
-    // Memanggil komponen halaman login
-    <LoginPage />
+    <DashboardPage />
   )
 }
 
