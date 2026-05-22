@@ -4,7 +4,6 @@ import TeamCanvas from './TeamCanvas';
 import ProjectRoadmap from './ProjectRoadmap';
 import TeamAnalytics from './TeamAnalytics';
 import SettingsPage from './SettingsPage';
-import MeetingSpace from './MeetingSpace';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -73,7 +72,6 @@ const DashboardPage = ({ onLogout }: DashboardProps) => {
               { id: 'Team Canvas', icon: <LayoutGrid size={18} /> },
               { id: 'Analytics', icon: <BarChart2 size={18} /> },
               { id: 'Project Roadmap', icon: <Map size={18} /> },
-              { id: 'Meeting Space', icon: <Video size={18} /> }
             ].map((item) => (
               <button 
                 key={item.id}
@@ -194,7 +192,6 @@ const DashboardPage = ({ onLogout }: DashboardProps) => {
         <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
           <div className="max-w-6xl mx-auto h-full min-h-[700px]"> 
             {activeTab === 'Team Canvas' && <TeamCanvas />}
-            {activeTab === 'Meeting Space' && <MeetingSpace />}
             {activeTab === 'Analytics' && <TeamAnalytics />}
             {activeTab === 'Project Roadmap' && <ProjectRoadmap />}
             {activeTab === 'Settings' && <SettingsPage />}

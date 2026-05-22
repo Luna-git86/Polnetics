@@ -1,11 +1,14 @@
-import { useState } from 'react';
-import { Mic, Sparkles, Video, MoreHorizontal, Calendar, MessageSquare, CheckCircle2, CircleDashed, AlertTriangle, GitBranch } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Mic, Sparkles, Video, MoreHorizontal, Calendar, CheckCircle2, CircleDashed, AlertTriangle, GitBranch, UserCircle2, Zap } from 'lucide-react';
+import { io } from 'socket.io-client';
+
 interface TeamCanvasProps {
   onJoinMeeting?: () => void;
 }
 
 const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
   const [showMenu, setShowMenu] = useState(false);
+  const [members, setMembers] = useState<any[]>([]);
   
   // === STATE LOGIC (DRAFT & VOICE) ===
   const [teksLaporan, setTeksLaporan] = useState("");
@@ -13,6 +16,63 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
   const [isSending, setIsSending] = useState(false);
   const [bahasa, setBahasa] = useState("id-ID"); 
   const [pesanError, setPesanError] = useState("");
+
+  // === STATE UNTUK LOG AKTIVITAS GIT ===
+  const [aktivitasGit, setAktivitasGit] = useState<any[]>([]);
+
+  // === AMBIL DATA ANGGOTA DINAMIS & DENGARKAN PERUBAHAN SECARA REAL-TIME ===
+  useEffect(() => {
+    const dataWorkspaceRaw = localStorage.getItem('activeWorkspace');
+    let workspaceIdAktif = null;
+
+    if (dataWorkspaceRaw) {
+      const workspaceObj = JSON.parse(dataWorkspaceRaw);
+      workspaceIdAktif = workspaceObj._id; 
+
+      if (workspaceObj.anggota && Array.isArray(workspaceObj.anggota)) {
+        setMembers(workspaceObj.anggota);
+      }
+    }
+
+    // KONEKSI SOCKET UNTUK REAL-TIME UPDATE
+    const socket = io('http://localhost:5000');
+
+    // 1. Mendengarkan Anggota Baru
+    socket.on('workspace-updated', (updatedWorkspace: any) => {
+      if (workspaceIdAktif && updatedWorkspace._id === workspaceIdAktif) {
+        setMembers(updatedWorkspace.anggota);
+        localStorage.setItem('activeWorkspace', JSON.stringify(updatedWorkspace));
+      }
+    });
+
+    // 2. Mendengarkan Aktivitas Git (Push/Commit/Pull) dari Server
+    socket.on('git-activity', (aktivitasBaru: any) => {
+      setAktivitasGit((prev) => [aktivitasBaru, ...prev].slice(0, 5)); // Simpan 5 log terbaru saja
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  // === FUNGSI MATEMATIKA POSISI NODE (ZIG-ZAG) ===
+  const hitungPosisiNode = (index: number, total: number) => {
+    const startX = total === 1 ? 50 : 20;
+    const endX = total === 1 ? 50 : 80;
+    const step = total > 1 ? (endX - startX) / (total - 1) : 0;
+    const x = startX + (step * index);
+    
+    const y = total === 1 ? 50 : (index % 2 === 0 ? 40 : 60);
+    return { x, y };
+  };
+
+  const visualStyles = [
+    { color: '#34C759', bg: 'bg-[#34C759]/10', text: 'text-[#34C759]', ring: 'ring-[#34C759]/30', icon: <CheckCircle2 size={14} className="text-[#34C759]" /> },
+    { color: '#0071E3', bg: 'bg-[#0071E3]/10', text: 'text-[#0071E3]', ring: 'ring-[#0071E3]/30', icon: <CircleDashed size={14} className="text-[#0071E3] animate-spin-slow" /> },
+    { color: '#AF52DE', bg: 'bg-[#AF52DE]/10', text: 'text-[#AF52DE]', ring: 'ring-[#AF52DE]/30', icon: <Sparkles size={14} className="text-[#AF52DE]" /> },
+    { color: '#FF9500', bg: 'bg-[#FF9500]/10', text: 'text-[#FF9500]', ring: 'ring-[#FF9500]/30', icon: <Zap size={14} className="text-[#FF9500]" /> },
+    { color: '#FF3B30', bg: 'bg-[#FF3B30]/10', text: 'text-[#FF3B30]', ring: 'ring-[#FF3B30]/30', icon: <AlertTriangle size={14} className="text-[#FF3B30]" /> }
+  ];
 
   // === FUNGSI REKAM SUARA ===
   const mulaiRekam = () => {
@@ -31,7 +91,20 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
     const teksSebelumnya = teksLaporan ? teksLaporan + " " : "";
 
     recognition.onstart = () => setIsListening(true);
-    recognition.onerror = () => setIsListening(false);
+    
+    recognition.onerror = (event: any) => {
+      console.error("Error Mikrofon:", event.error);
+      setIsListening(false);
+      
+      if (event.error === 'not-allowed') {
+        alert("Izin mikrofon ditolak! Silakan klik ikon gembok di URL browser dan izinkan mikrofon.");
+      } else if (event.error === 'no-speech') {
+        // Abaikan
+      } else {
+        alert(`Mikrofon error: ${event.error}. Coba gunakan Google Chrome biasa.`);
+      }
+    };
+    
     recognition.onend = () => setIsListening(false);
 
     recognition.onresult = (event: any) => {
@@ -54,10 +127,9 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
 
     const dataUserRaw = localStorage.getItem('user');
     const userObj = dataUserRaw ? JSON.parse(dataUserRaw) : null;
-    const namaPengirim = userObj?.nama || "Ambas";
+    const namaPengirim = userObj?.nama || "Member";
     const roleTeknis = userObj?.role || "frontend"; 
 
-    // EKSTRAK ID WORKSPACE (SOLUSI ERROR OBJECT ID)
     const dataWorkspaceRaw = localStorage.getItem('activeWorkspace');
     const workspaceObj = dataWorkspaceRaw ? JSON.parse(dataWorkspaceRaw) : null;
     const workspaceIdAktif = workspaceObj?._id;
@@ -82,7 +154,7 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
       });
 
       if (response.ok) {
-        setTeksLaporan(''); // Bersihkan kotak input jika berhasil
+        setTeksLaporan(''); 
       } else {
         const errData = await response.json();
         setPesanError(errData.pesan || "Gagal memproses AI");
@@ -126,18 +198,15 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
                 <div className="absolute top-12 right-0 w-56 bg-white/95 backdrop-blur-xl border border-black/[0.04] rounded-[16px] shadow-[0_12px_40px_rgb(0,0,0,0.12)] p-2 z-50 animate-in fade-in slide-in-from-top-2">
                   <button className="w-full flex items-center gap-3 p-2.5 hover:bg-[#F5F5F7] rounded-[10px] transition-colors text-left group">
                     <GitBranch size={16} className="text-slate-600 group-hover:text-slate-900" />
-<span className="text-[13px] font-semibold text-slate-700 group-hover:text-slate-900">Integrasi ke GitHub Repo</span>
+                    <span className="text-[13px] font-semibold text-slate-700 group-hover:text-slate-900">Integrasi ke GitHub Repo</span>
                   </button>
                 </div>
               )}
             </div>
           </div>
-          <p className="text-[15px] text-slate-500 font-medium mb-4">CodeWorkZ AI is listening for your updates.</p>
-          <div className="flex items-center gap-2 text-[#0071E3] text-[13px] font-semibold">
-            <Sparkles size={16} /> AI Auto-tagging Active
-          </div>
 
-          {/* Notifikasi Error Backend (Muncul jika Backend mati/gagal) */}
+          {/* Dihapus: Teks gimmick "CodeWorkZ AI is listening..." sesuai permintaan */}
+
           {pesanError && (
             <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm font-medium animate-in fade-in flex justify-between items-center">
               <span>{pesanError}</span>
@@ -146,65 +215,78 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
           )}
         </div>
 
-        {/* MIDDLE SECTION: AVATAR NODES */}
+        {/* MIDDLE SECTION: AVATAR NODES (DINAMIS) */}
         <div className="flex-1 relative z-10 w-full h-full min-h-[300px]">
+          
+          {/* Garis Penghubung (SVG Line Generator) */}
           <svg className="absolute inset-0 w-full h-full pointer-events-none z-0" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <path d="M 30 50 Q 40 35 50 50" fill="none" stroke="#34C759" strokeWidth="0.5" strokeDasharray="1 1" className="opacity-60" />
-            <path d="M 50 50 Q 60 60 70 50" fill="none" stroke="#FF3B30" strokeWidth="0.5" className="opacity-40" />
+            {members.map((_, i) => {
+              if (i === members.length - 1) return null; 
+              const pos1 = hitungPosisiNode(i, members.length);
+              const pos2 = hitungPosisiNode(i + 1, members.length);
+              const style = visualStyles[i % visualStyles.length];
+              
+              return (
+                <path 
+                  key={`line-${i}`} 
+                  d={`M ${pos1.x} ${pos1.y} Q ${(pos1.x + pos2.x) / 2} 50 ${pos2.x} ${pos2.y}`} 
+                  fill="none" 
+                  stroke={style.color} 
+                  strokeWidth="0.3" 
+                  strokeDasharray="1 1" 
+                  className="opacity-50" 
+                />
+              );
+            })}
           </svg>
 
-          {/* Node: Ambas */}
-          <div className="absolute top-[50%] left-[30%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group z-10">
-            <div className="absolute bottom-full mb-4 w-56 bg-white/90 backdrop-blur-md rounded-[20px] p-4 shadow-[0_12px_40px_rgb(0,0,0,0.08)] border border-black/[0.04] opacity-0 group-hover:opacity-100 group-hover:-translate-y-2 transition-all duration-300 pointer-events-none">
-              <p className="text-[12px] font-medium text-slate-600 leading-relaxed">API Slicing sudah selesai, butuh review untuk payload JWT-nya.</p>
+          {/* Render Avatar Dinamis */}
+          {members.length === 0 ? (
+            <div className="absolute inset-0 flex items-center justify-center text-slate-400 font-medium text-sm">
+               Sedang memuat data tim...
             </div>
-            <div className="relative w-16 h-16 rounded-full bg-white border-4 border-white shadow-[0_4px_15px_rgba(0,0,0,0.05)] flex items-center justify-center ring-4 ring-[#34C759]/30 hover:scale-105 transition-transform cursor-pointer">
-              <div className="w-full h-full rounded-full bg-[#34C759]/10 text-[#34C759] flex items-center justify-center font-bold text-xl tracking-tight">AM</div>
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm border border-slate-100">
-                <CheckCircle2 size={14} className="text-[#34C759]" />
-              </div>
-            </div>
-            <h4 className="mt-4 text-[15px] font-bold text-slate-900 tracking-tight">Ambas</h4>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mt-0.5">Frontend</p>
-          </div>
-
-          {/* Node: Juliper */}
-          <div className="absolute top-[50%] left-[50%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group z-10">
-             <div className="absolute bottom-full mb-4 w-56 bg-white/90 backdrop-blur-md rounded-[20px] p-4 shadow-[0_12px_40px_rgb(0,0,0,0.08)] border border-black/[0.04] opacity-0 group-hover:opacity-100 group-hover:-translate-y-2 transition-all duration-300 pointer-events-none">
-              <p className="text-[12px] font-medium text-slate-600 leading-relaxed">Sedang mengintegrasikan database dengan service Auth yang baru.</p>
-            </div>
-            <div className="relative w-16 h-16 rounded-full bg-white border-4 border-white shadow-[0_4px_15px_rgba(0,0,0,0.05)] flex items-center justify-center ring-4 ring-[#0071E3]/30 hover:scale-105 transition-transform cursor-pointer">
-              <div className="w-full h-full rounded-full bg-[#0071E3]/10 text-[#0071E3] flex items-center justify-center font-bold text-xl tracking-tight">JS</div>
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm border border-slate-100">
-                <CircleDashed size={14} className="text-[#0071E3] animate-spin-slow" />
-              </div>
-            </div>
-            <h4 className="mt-4 text-[15px] font-bold text-slate-900 tracking-tight">Juliper</h4>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mt-0.5">Backend</p>
-          </div>
-
-          {/* Node: Dasacak */}
-          <div className="absolute top-[50%] left-[70%] -translate-x-1/2 -translate-y-1/2 flex flex-col items-center group z-10">
-            <div className="absolute bottom-full mb-5 whitespace-nowrap bg-[#FF3B30]/5 backdrop-blur-md rounded-full px-4 py-2 shadow-sm border border-[#FF3B30]/20 flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-[#FF3B30] animate-pulse"></div>
-              <span className="text-[12px] font-bold tracking-wide text-[#FF3B30]">Waiting for Assets</span>
-            </div>
-            <div className="relative w-16 h-16 rounded-full bg-white border-4 border-white shadow-[0_4px_15px_rgba(0,0,0,0.05)] flex items-center justify-center ring-4 ring-[#FF3B30]/30 hover:scale-105 transition-transform cursor-pointer">
-              <div className="w-full h-full rounded-full bg-[#FF3B30]/10 text-[#FF3B30] flex items-center justify-center font-bold text-xl tracking-tight">DC</div>
-              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm border border-slate-100">
-                <AlertTriangle size={14} className="text-[#FF3B30]" />
-              </div>
-            </div>
-            <h4 className="mt-4 text-[15px] font-bold text-slate-900 tracking-tight">Dasacak</h4>
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mt-0.5">Design</p>
-          </div>
+          ) : (
+            members.map((member, i) => {
+              const pos = hitungPosisiNode(i, members.length);
+              const style = visualStyles[i % visualStyles.length];
+              
+              return (
+                <div 
+                  key={`node-${i}`} 
+                  className="absolute flex flex-col items-center group z-10"
+                  style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }}
+                >
+                  <div className="absolute bottom-full mb-4 w-56 bg-white/90 backdrop-blur-md rounded-[20px] p-4 shadow-[0_12px_40px_rgb(0,0,0,0.08)] border border-black/[0.04] opacity-0 group-hover:opacity-100 group-hover:-translate-y-2 transition-all duration-300 pointer-events-none">
+                    <p className="text-[12px] font-medium text-slate-600 leading-relaxed">
+                      Terhubung aktif ke dalam Workspace. Menunggu pembaruan aktivitas...
+                    </p>
+                  </div>
+                  
+                  <div className={`relative w-16 h-16 rounded-full bg-white border-4 border-white shadow-[0_4px_15px_rgba(0,0,0,0.05)] flex items-center justify-center ring-4 ${style.ring} hover:scale-105 transition-transform cursor-pointer`}>
+                    <div className={`w-full h-full rounded-full ${style.bg} ${style.text} flex items-center justify-center font-bold text-xl tracking-tight`}>
+                      {member.nama ? member.nama.substring(0, 2).toUpperCase() : <UserCircle2 />}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white flex items-center justify-center shadow-sm border border-slate-100">
+                      {style.icon}
+                    </div>
+                  </div>
+                  
+                  <h4 className="mt-4 text-[15px] font-bold text-slate-900 tracking-tight capitalize whitespace-nowrap">
+                    {member.nama ? member.nama.split(' ')[0] : 'Member'}
+                  </h4>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mt-0.5">
+                    {member.role || 'Member'}
+                  </p>
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* BOTTOM SECTION: INPUT AI */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl z-20">
           <div className="w-full bg-white/90 backdrop-blur-xl border border-black/[0.04] p-2 rounded-[24px] shadow-[0_12px_40px_rgb(0,0,0,0.08)] flex items-center gap-3 transition-all hover:bg-white focus-within:bg-white focus-within:shadow-[0_16px_50px_rgb(0,0,0,0.1)] focus-within:border-slate-200">
             
-            {/* Input Text / Status */}
             <input 
               type="text" 
               value={teksLaporan}
@@ -214,12 +296,10 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
               className="flex-1 bg-transparent border-none outline-none text-[15px] font-medium text-slate-700 placeholder:text-slate-400 px-4 py-3 disabled:opacity-60"
             />
             
-            {/* Tombol Ganti Bahasa Voice */}
             <button onClick={() => setBahasa(bahasa === "id-ID" ? "en-US" : "id-ID")} disabled={isSending || isListening} className="px-2 py-1 bg-[#F5F5F7] text-slate-600 rounded-lg text-[10px] font-bold hover:bg-slate-200 transition-colors">
               {bahasa === "id-ID" ? "ID" : "EN"}
             </button>
 
-            {/* Tombol Mic */}
             <button 
               onClick={isListening ? () => setIsListening(false) : mulaiRekam}
               disabled={isSending}
@@ -230,7 +310,6 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
               <Mic size={22} />
             </button>
             
-            {/* Tombol Kirim AI */}
             <button 
               onClick={() => kirimLaporan()}
               disabled={isSending || !teksLaporan}
@@ -244,8 +323,10 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
 
       </div>
 
-      {/* === RIGHT SIDEBAR === */}
+      {/* === RIGHT SIDEBAR (ACTIVITIES & REVIEW) === */}
       <div className="w-80 flex flex-col gap-6 h-full">
+        
+        {/* Kotak Sprint Review */}
         <div className="bg-white rounded-[24px] p-6 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative overflow-hidden shrink-0">
           <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[#0071E3]/10 to-transparent rounded-bl-full pointer-events-none"></div>
           <div className="flex items-center gap-3 text-[#0071E3] mb-4">
@@ -259,38 +340,48 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
           </button>
         </div>
 
+        {/* Kotak Git Activities (Menggantikan Recent Updates) */}
         <div className="bg-white rounded-[24px] p-6 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex-1 overflow-y-auto custom-scrollbar">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-[15px] font-semibold tracking-tight text-slate-900">Recent Updates</h3>
+            <h3 className="text-[15px] font-semibold tracking-tight text-slate-900">Git Activities</h3>
             <button className="p-1.5 rounded-full hover:bg-[#F5F5F7] text-slate-400 transition-all active:scale-90">
-              <MoreHorizontal size={16} />
+              <GitBranch size={16} />
             </button>
           </div>
+          
           <div className="space-y-6">
-            <div className="flex gap-4 group cursor-pointer">
-              <div className="w-8 h-8 rounded-full bg-[#34C759]/10 text-[#34C759] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                <CheckCircle2 size={16} />
-              </div>
-              <div>
-                <p className="text-[13px] text-slate-700 font-medium leading-relaxed">
-                  <span className="font-semibold text-slate-900">Dasacak</span> menyelesaikan modul autentikasi JWT.
-                </p>
-                <span className="text-[11px] text-slate-400 mt-1 block">10 mins ago</span>
-              </div>
-            </div>
-            <div className="flex gap-4 group cursor-pointer">
-              <div className="w-8 h-8 rounded-full bg-[#0071E3]/10 text-[#0071E3] flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                <MessageSquare size={14} />
-              </div>
-              <div>
-                <p className="text-[13px] text-slate-700 font-medium leading-relaxed">
-                  <span className="font-semibold text-slate-900">Juliper</span> meninggalkan komentar di <span className="text-[#0071E3] group-hover:underline">Design System</span>.
-                </p>
-                <span className="text-[11px] text-slate-400 mt-1 block">1 hour ago</span>
-              </div>
-            </div>
+            {aktivitasGit.length === 0 ? (
+              <p className="text-[12px] text-slate-400 font-medium text-center italic mt-10">
+                Menunggu aktivitas push/commit terbaru dari repositori...
+              </p>
+            ) : (
+              aktivitasGit.map((akt, i) => (
+                <div key={i} className="flex gap-4 group cursor-pointer animate-in fade-in slide-in-from-top-2">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform ${
+                    akt.isWebhook ? 'bg-[#000]/10 text-black' : 'bg-[#0071E3]/10 text-[#0071E3]'
+                  }`}>
+                    {akt.action === 'GitHub Push' ? <GitBranch size={14} /> : <CheckCircle2 size={16} />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[13px] text-slate-700 font-medium leading-relaxed">
+                      <span className="font-semibold text-slate-900">{akt?.user || 'Sistem'}</span> melakukan {akt?.action || 'Pembaruan'}.
+                    </p>
+                    {/* Kotak Pesan Commit */}
+                    {akt.pesan && (
+                      <div className="mt-1.5 p-2 bg-slate-50 border border-slate-100 rounded-lg text-[11px] text-slate-600 italic border-l-2 border-l-slate-300">
+                        "{akt.pesan}"
+                      </div>
+                    )}
+                    <span className="text-[10px] text-slate-400 mt-1.5 block font-semibold uppercase tracking-wider">
+                      {akt.waktu ? new Date(akt.waktu).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Baru saja'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
+
       </div>
     </div>
   );

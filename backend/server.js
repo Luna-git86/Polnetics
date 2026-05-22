@@ -201,7 +201,7 @@ app.get('/api/laporan', async (req, res) => {
 // RUTE UNTUK COMMIT
 app.post('/api/git/commit', async (req, res) => {
     try {
-        const { pesanCommit } = req.body;
+        const { pesanCommit, namaUser } = req.body;
         
         if (!pesanCommit) {
             return res.status(400).json({ status: "gagal", pesan: "Pesan commit tidak boleh kosong" });
@@ -211,11 +211,19 @@ app.post('/api/git/commit', async (req, res) => {
         await git.add('./*'); 
         const hasilCommit = await git.commit(pesanCommit);
 
-    // INI PENGERAS SUARANYA:
-    io.emit('notif-workspace', {
-        judul: "Pembaruan Disimpan! 📝",
-        pesan: `Ada yang baru saja melakukan Commit: "${pesanCommit}"`
-    });
+        // Notifikasi Pop-up
+        io.emit('notif-workspace', {
+            judul: "Pembaruan Disimpan! 📝",
+            pesan: `Ada yang baru saja melakukan Commit: "${pesanCommit}"`
+        });
+
+        // Kirim Log ke Sidebar Canvas
+        io.emit('git-activity', {
+            user: namaUser || "System",
+            action: 'Commit',
+            pesan: pesanCommit,
+            waktu: new Date()
+        });
 
         res.json({
             status: "sukses",
@@ -231,18 +239,25 @@ app.post('/api/git/commit', async (req, res) => {
 // RUTE UNTUK PUSH
 app.post('/api/git/push', async (req, res) => {
     try {
-        const { branch } = req.body; 
+        const { branch, namaUser } = req.body; 
         const branchTujuan = branch || 'main';
 
         console.log(`Menjalankan git push ke branch ${branchTujuan}...`);
-        // ... kode git.push
-await git.push('origin', branchTujuan);
+        await git.push('origin', branchTujuan);
 
-// INI PENGERAS SUARANYA:
-io.emit('notif-workspace', {
-    judul: "Kode Mengudara! 🚀",
-    pesan: `Kode terbaru telah di-push ke GitHub (Branch: ${branchTujuan})`
-});
+        // Notifikasi Pop-up
+        io.emit('notif-workspace', {
+            judul: "Kode Mengudara! 🚀",
+            pesan: `Kode terbaru telah di-push ke GitHub (Branch: ${branchTujuan})`
+        });
+
+        // Kirim Log ke Sidebar Canvas
+        io.emit('git-activity', {
+            user: namaUser || "System",
+            action: 'Push',
+            pesan: `Menerbangkan kode ke branch ${branchTujuan}`,
+            waktu: new Date()
+        });
 
         res.json({
             status: "sukses",
@@ -257,13 +272,22 @@ io.emit('notif-workspace', {
 // RUTE UNTUK PULL
 app.post('/api/git/pull', async (req, res) => {
     try {
+        const { namaUser } = req.body;
         console.log("Menjalankan git pull...");
         const hasilPull = await git.pull();
 
-        // INI PENGERAS SUARANYA:
+        // Notifikasi Pop-up
         io.emit('notif-workspace', {
             judul: "Sinkronisasi Berhasil! 🔄",
             pesan: "Data terbaru telah ditarik (pull) ke dalam Workspace."
+        });
+
+        // Kirim Log ke Sidebar Canvas
+        io.emit('git-activity', {
+            user: namaUser || "System",
+            action: 'Pull',
+            pesan: "Menarik kode terbaru dari GitHub",
+            waktu: new Date()
         });
 
         res.json({
@@ -279,21 +303,42 @@ app.post('/api/git/pull', async (req, res) => {
 
 
 // ==========================================
-// FITUR 3: WEBHOOK (OTOMATISASI GITHUB)
+// FITUR 3: WEBHOOK (TANGKAPAN DARI NGROK & GITHUB)
 // ==========================================
 app.post('/api/webhook', async (req, res) => {
-    console.log("🔔 Sinyal dari GitHub masuk!");
+    console.log("🔔 Sinyal dari GitHub masuk via Ngrok!");
     try {
-        await git.pull();
-        // INI PENGERAS SUARANYA:
-        io.emit('notif-workspace', { 
-            judul: "Pembaruan Git 🚀", 
-            pesan: "Ada pembaruan kode terbaru yang baru saja ditarik!" 
-        });
-        
-        console.log("✅ Berhasil pull dan sebar notif!");
-        res.status(200).send("Webhook berhasil dieksekusi");
+        const payload = req.body;
+
+        // Mendeteksi jika GitHub mengirimkan data Push/Commit
+        if (payload.commits && payload.head_commit) {
+            const commitMessage = payload.head_commit.message;
+            const pusherName = payload.pusher.name;
+            const branchName = payload.ref.replace('refs/heads/', '');
+
+            // Tarik otomatis kode terbaru ke server lokal kita
+            await git.pull();
+
+            // 1. Notifikasi Pop-up Global
+            io.emit('notif-workspace', { 
+                judul: `Pembaruan Git 🚀 (${branchName})`, 
+                pesan: `${pusherName} melakukan push: "${commitMessage}"` 
+            });
+
+            // 2. Kirim Log ke Sidebar Canvas secara Real-time
+            io.emit('git-activity', {
+                user: pusherName,
+                action: 'GitHub Push',
+                pesan: commitMessage,
+                waktu: new Date(),
+                isWebhook: true
+            });
+            
+            console.log(`✅ Webhook sukses: ${pusherName} pushed "${commitMessage}"`);
+        }
+        res.status(200).send("Webhook berhasil diproses");
     } catch (error) {
+        console.error("Gagal eksekusi webhook:", error);
         res.status(500).send("Gagal eksekusi webhook");
     }
 });
@@ -332,9 +377,19 @@ app.post('/api/workspace/join', async (req, res) => {
         const sudahGabung = workspace.anggota.find(m => m.user.toString() === userId);
         if (sudahGabung) return res.status(400).json({ status: "gagal", pesan: "Kamu sudah berada di Workspace ini." });
 
-        // Masukkan user baru sebagai 'Member'
+       // Masukkan user baru sebagai 'Member'
         workspace.anggota.push({ user: userId, nama: namaUser, role: 'Member' });
         await workspace.save();
+
+        // === TAMBAHAN BARU: PENGERAS SUARA SOCKET ===
+        // Memancarkan data workspace yang baru di-update ke semua orang
+        io.emit('workspace-updated', workspace);
+        
+        // Memunculkan pop-up notifikasi cantik di layar semua orang
+        io.emit('notif-workspace', {
+            judul: "Anggota Baru Bergabung! 🎉",
+            pesan: `${namaUser} telah masuk ke dalam Workspace.`
+        });
 
         res.json({ status: "sukses", pesan: `Berhasil bergabung ke ${workspace.namaWorkspace}`, data: workspace });
     } catch (error) {
