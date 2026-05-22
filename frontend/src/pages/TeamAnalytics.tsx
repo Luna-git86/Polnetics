@@ -1,133 +1,197 @@
-import { CheckCircle2, CircleDashed, AlertTriangle, ChevronRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { CheckCircle2, AlertTriangle, Activity, ChevronRight, Zap, Lightbulb, Clock } from 'lucide-react';
 
 const TeamAnalytics = () => {
-  const tasks = [
-    { id: 1, initials: 'JS', name: 'Juliper Saracak', time: '1 jam lalu', role: 'Backend', desc: 'Slicing API Authentication', status: 'Completed', detail: 'Auth API', color: 'bg-slate-100 text-slate-700' },
-    { id: 2, initials: 'AM', name: 'Ambas', time: '1 jam lalu', role: 'Frontend', desc: 'Design Log Component', status: 'In progress', detail: 'Design Log', color: 'bg-blue-50 text-blue-600' },
-    { id: 3, initials: 'DC', name: 'DasaCak', time: '2 jam lalu', role: 'Frontend', desc: 'Menunggu aset UI/UX', status: 'Blocked', detail: 'Design Log', color: 'bg-red-50 text-red-600' },
-  ];
+  // === STATE APLIKASI ===
+  const [semuaLaporan, setSemuaLaporan] = useState<any[]>([]);
+  const [anggotaKesusahan, setAnggotaKesusahan] = useState<any[]>([]);
+  const [anggotaSelesai, setAnggotaSelesai] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const risks = [
-    { id: 1, initials: 'SC', name: 'SaraCak', role: 'Frontend; Design', level: 'Low', badge: 'text-[#34C759] bg-[#34C759]/10' },
-    { id: 2, initials: 'JC', name: 'JulCak', role: 'Designer; Web', level: 'Medium', badge: 'text-[#FF9500] bg-[#FF9500]/10' },
-    { id: 3, initials: 'DC', name: 'DasaCak', role: 'Backend; API', level: 'High', badge: 'text-[#FF3B30] bg-[#FF3B30]/10' },
-  ];
+  // === FUNGSI MENYEDOT DATA DARI SERVER.JS ===
+  useEffect(() => {
+    const fetchLaporan = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/laporan');
+        const result = await response.json();
+        
+        if (result.data) {
+          const dataAsli = result.data.reverse(); // Yang terbaru di atas
+          setSemuaLaporan(dataAsli);
+
+          // === LOGIKA AI SEDERHANA (PENYORTIRAN OTOMATIS) ===
+          // Memisahkan siapa yang "Stuck/Kesusahan" dan siapa yang "Aman/Selesai"
+          // Berdasarkan kata kunci pada teks laporan atau hasil analisis AI
+          const butuhBantuan = dataAsli.filter((lap: any) => 
+            lap.teksLaporan.toLowerCase().match(/kendala|error|bug|susah|hambatan|gagal|stuck/i) || 
+            (lap.hasilAnalisis && lap.hasilAnalisis.toLowerCase().match(/risiko tinggi|bantu/i))
+          );
+
+          const sudahSelesai = dataAsli.filter((lap: any) => 
+            lap.teksLaporan.toLowerCase().match(/selesai|berhasil|aman|done|sukses|lancar/i) &&
+            !butuhBantuan.includes(lap) // Pastikan tidak masuk daftar kesusahan
+          );
+
+          setAnggotaKesusahan(butuhBantuan);
+          setAnggotaSelesai(sudahSelesai);
+        }
+      } catch (error) {
+        console.error("Gagal terhubung ke database:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLaporan();
+  }, []);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 font-sans text-slate-900">
+    <div className="animate-in fade-in duration-300 font-sans pb-10">
       
-      {/* GRID KARTU ATAS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* Kartu 1: Sprint Velocity (Apple Style Card) */}
-        <div className="bg-white rounded-[24px] p-8 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold tracking-tight text-slate-900">Sprint Velocity</h2>
-            <span className="text-xs font-medium text-[#0071E3] bg-[#0071E3]/10 px-3 py-1 rounded-full">
-              Siklus Aktif
-            </span>
+      {/* --- HEADER --- */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-[#0071E3]">
+            <Activity size={24} />
           </div>
-          
-          <div className="relative w-40 h-40 mx-auto mb-6 flex items-center justify-center">
-            {/* SVG Donut Chart (Tipis & Elegan) */}
-            <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-              <path className="text-slate-100" strokeDasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="2" />
-              <path className="text-[#0071E3]" strokeDasharray="68, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
-            <div className="absolute flex flex-col items-center justify-center">
-              <span className="text-4xl font-semibold tracking-tight text-slate-900">68%</span>
-              <span className="text-[11px] text-slate-500 font-medium uppercase tracking-wider mt-0.5">Selesai</span>
-            </div>
-          </div>
-
-          <div className="flex justify-between gap-4 mt-auto">
-            <div className="bg-[#F5F5F7] rounded-[16px] p-4 w-full text-center">
-              <div className="text-xl font-semibold tracking-tight text-slate-900 mb-0.5">34</div>
-              <div className="text-[11px] font-medium text-slate-500">Tugas Selesai</div>
-            </div>
-            <div className="bg-[#F5F5F7] rounded-[16px] p-4 w-full text-center">
-              <div className="text-xl font-semibold tracking-tight text-slate-900 mb-0.5">16</div>
-              <div className="text-[11px] font-medium text-slate-500">Tersisa</div>
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">AI Team Analytics</h1>
+            <p className="text-sm text-slate-500">Live monitoring dari Sync Canva AI</p>
           </div>
         </div>
-
-        {/* Kartu 2: Risk Assessment */}
-        <div className="bg-white rounded-[24px] p-8 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col">
-          <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-6">Penilaian Risiko</h2>
-          
-          <div className="space-y-3 flex-1">
-            {risks.map((risk) => (
-              <div key={risk.id} className="flex items-center justify-between p-3 rounded-[16px] hover:bg-[#F5F5F7] transition-colors cursor-pointer group">
-                <div className="flex items-center gap-4">
-                  {/* Avatar Lingkaran Clean */}
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center font-medium text-sm bg-gradient-to-b from-slate-50 to-slate-100 border border-slate-200/60 text-slate-600 shadow-sm">
-                    {risk.initials}
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold tracking-tight text-slate-900">{risk.name}</h4>
-                    <p className="text-[12px] text-slate-500 font-medium">{risk.role}</p>
-                  </div>
-                </div>
-                <div className={`px-3 py-1 text-[11px] font-semibold rounded-full ${risk.badge}`}>
-                  {risk.level}
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-full text-sm font-semibold text-slate-600 shadow-sm">
+          <Clock size={16} className="text-[#0071E3]" />
+          Update Real-time
         </div>
-
       </div>
 
-      {/* SECTION BAWAH: PROGRESS SUMMARY */}
-      <div className="bg-white rounded-[24px] p-8 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
-        <h2 className="text-lg font-semibold tracking-tight text-slate-900 mb-6">Aktivitas Tim</h2>
-        
-        <div className="space-y-2">
-          {tasks.map((task, index) => (
-            <div key={task.id}>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-[16px] hover:bg-[#F5F5F7] transition-colors cursor-pointer group">
-                
-                <div className="flex items-center gap-4 mb-3 sm:mb-0">
-                  <div className={`w-11 h-11 rounded-full flex items-center justify-center font-medium text-sm border border-black/[0.05] shadow-sm ${task.color}`}>
-                     {task.initials}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <h4 className="text-sm font-semibold tracking-tight text-slate-900">{task.name}</h4>
-                      <span className="text-[11px] text-slate-400 font-medium">{task.time}</span>
-                    </div>
-                    <p className="text-[13px] text-slate-500">
-                      <span className="font-medium text-slate-700">{task.role}</span> &mdash; {task.desc}
-                    </p>
-                  </div>
-                </div>
+      {isLoading ? (
+        // --- LOADING STATE ---
+        <div className="flex flex-col items-center justify-center h-64 bg-white rounded-3xl border border-slate-100 shadow-sm">
+          <Zap className="animate-pulse text-[#0071E3] mb-3" size={32} />
+          <p className="text-slate-500 font-medium text-sm">AI sedang membaca database tim...</p>
+        </div>
+      ) : (
+        <>
+          {/* --- AI INSIGHT WIDGET (Rekomendasi Cerdas) --- */}
+          <div className="bg-gradient-to-r from-[#0071E3] to-[#005bb5] rounded-3xl p-6 mb-8 text-white shadow-lg relative overflow-hidden">
+            <Zap className="absolute right-[-20px] top-[-20px] w-48 h-48 text-white opacity-10" />
+            <div className="flex items-start gap-4 relative z-10">
+              <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm">
+                <Lightbulb size={28} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold mb-1">AI Executive Summary</h2>
+                <p className="text-blue-100 text-sm leading-relaxed max-w-3xl">
+                  {anggotaKesusahan.length > 0 
+                    ? `Ada ${anggotaKesusahan.length} anggota tim yang sedang menghadapi hambatan. Segera koordinasikan bantuan untuk menjaga produktivitas Sprint hari ini.` 
+                    : `Luar biasa! Tidak ada anggota tim yang melaporkan hambatan kritis hari ini. ${anggotaSelesai.length} tugas berhasil diselesaikan dengan baik.`}
+                </p>
+              </div>
+            </div>
+          </div>
 
-                <div className="flex items-center gap-4">
-                  <div className={`flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 rounded-full ${
-                    task.status === 'Completed' ? 'text-[#34C759] bg-[#34C759]/10' : 
-                    task.status === 'In progress' ? 'text-[#0071E3] bg-[#0071E3]/10' : 
-                    'text-[#FF3B30] bg-[#FF3B30]/10'
-                  }`}>
-                    {task.status === 'Completed' && <CheckCircle2 size={14} />}
-                    {task.status === 'In progress' && <CircleDashed size={14} className="animate-spin-slow" />}
-                    {task.status === 'Blocked' && <AlertTriangle size={14} />}
-                    <span>{task.status}</span>
-                  </div>
-                  <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-700 transition-colors" />
-                </div>
-                
+          {/* --- GRID HIGHLIGHT (Kesusahan vs Selesai) --- */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            
+            {/* KOTAK MERAH: Butuh Bantuan */}
+            <div className="bg-white border border-red-100 rounded-3xl p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertTriangle size={20} className="text-red-500" />
+                <h2 className="text-base font-bold text-slate-800">Needs Attention (Blocked)</h2>
+                <span className="ml-auto bg-red-100 text-red-600 px-2.5 py-0.5 rounded-full text-xs font-bold">
+                  {anggotaKesusahan.length} Anggota
+                </span>
               </div>
               
-              {/* Garis pemisah super tipis khas iOS, tidak ada di elemen terakhir */}
-              {index !== tasks.length - 1 && (
-                <div className="h-px bg-slate-100 ml-[68px] my-1"></div>
-              )}
+              <div className="space-y-3">
+                {anggotaKesusahan.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">Semua anggota aman, tidak ada kendala.</p>
+                ) : (
+                  anggotaKesusahan.map((lap, i) => (
+                    <div key={i} className="p-3 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-red-200 text-red-700 flex items-center justify-center text-xs font-bold shrink-0">
+                        {lap.nama?.substring(0,2).toUpperCase() || 'AI'}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-800">{lap.nama}</h4>
+                        <p className="text-xs text-red-600 mt-0.5 line-clamp-2">{lap.teksLaporan}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
 
+            {/* KOTAK HIJAU: Sudah Selesai */}
+            <div className="bg-white border border-emerald-100 rounded-3xl p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                <CheckCircle2 size={20} className="text-[#34C759]" />
+                <h2 className="text-base font-bold text-slate-800">Completed (On Track)</h2>
+                <span className="ml-auto bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full text-xs font-bold">
+                  {anggotaSelesai.length} Tugas
+                </span>
+              </div>
+              
+              <div className="space-y-3">
+                {anggotaSelesai.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic">Belum ada tugas yang dilaporkan selesai.</p>
+                ) : (
+                  anggotaSelesai.map((lap, i) => (
+                    <div key={i} className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center text-xs font-bold shrink-0">
+                        {lap.nama?.substring(0,2).toUpperCase() || 'AI'}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-800">{lap.nama}</h4>
+                        <p className="text-xs text-emerald-700 mt-0.5 line-clamp-2">{lap.teksLaporan}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* --- LOG LAPORAN LENGKAP --- */}
+          <h2 className="text-lg font-bold text-slate-800 mb-4">Semua Log Laporan Hari Ini</h2>
+          <div className="bg-white border border-slate-200 rounded-3xl p-2 shadow-sm">
+            {semuaLaporan.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-sm">Data laporan kosong.</div>
+            ) : (
+              semuaLaporan.map((laporan, index) => (
+                <div key={index} className="group flex items-start justify-between p-4 hover:bg-[#F5F5F7] rounded-2xl transition-colors cursor-pointer border-b border-slate-50 last:border-0">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold bg-slate-100 text-slate-600 border border-slate-200 shrink-0 mt-1">
+                      {laporan.nama ? laporan.nama.substring(0, 2).toUpperCase() : 'AI'}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-sm font-bold text-slate-800">{laporan.nama}</h4>
+                        <span className="text-[11px] text-slate-400">
+                          {laporan.createdAt ? new Date(laporan.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Hari ini'}
+                        </span>
+                      </div>
+                      <p className="text-[13px] text-slate-600 leading-relaxed max-w-3xl mb-2">{laporan.teksLaporan}</p>
+                      
+                      {laporan.hasilAnalisis && (
+                        <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-xl inline-block mt-1">
+                          <p className="text-[12px] text-slate-700 leading-relaxed flex items-start gap-2">
+                            <Zap size={14} className="text-[#0071E3] shrink-0 mt-0.5" />
+                            <span><span className="font-bold text-[#0071E3]">Analisis AI:</span> {laporan.hasilAnalisis.replace('(DUMMY MODE)', '').trim()}</span>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-slate-300 group-hover:text-[#0071E3] mt-2 transition-colors" />
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };
