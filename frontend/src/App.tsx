@@ -1,60 +1,101 @@
 import { useState } from 'react';
 
-function App() {
-  // Menggunakan TypeScript untuk mendefinisikan tipe data state
+function TesAuth() {
   const [status, setStatus] = useState<string>("Belum ada aktivitas");
-
-  // 1. Fungsi Tes Sedot Data (GET)
-  const tesAmbilData = async () => {
-    setStatus("Sedang mengambil data...");
-    try {
-      const response = await fetch("http://localhost:5000/api/laporan");
-      const data = await response.json();
-      console.log("📡 DATA DARI BACKEND (GET):", data);
-      setStatus("Berhasil GET! Cek Console Browser (F12)");
-    } catch (error) {
-      console.error("Gagal GET:", error);
-      setStatus("Error GET! Server backend mati?");
-    }
+  const [token, setToken] = useState<string | null>(localStorage.getItem('token')); // Mengambil token jika sudah login sebelumnya
+  
+  // Data sementara untuk tes (bisa diganti dengan input form beneran nanti)
+  const dataPalsu = {
+    nama: "Luna",
+    email: "luna.tes@polnetics.com",
+    password: "password123",
+    role: "backend"
   };
 
-  // 2. Fungsi Tes Kirim Data (POST)
-  const tesKirimData = async () => {
-    setStatus("Sedang mengirim ke AI...");
+  // 1. Fungsi Tes Sign Up
+  const tesDaftar = async () => {
+    setStatus("Sedang mendaftarkan akun...");
     try {
-      const laporanPalsu = {
-        teksLaporan: "Hari ini Zidan lagi ngetes fetch pakai TypeScript, butuh bantuan untuk bikin Dependency Map."
-      };
-
-      const response = await fetch("http://localhost:5000/api/laporan", {
+      const response = await fetch("http://localhost:5000/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(laporanPalsu),
+        body: JSON.stringify(dataPalsu),
       });
       
       const data = await response.json();
-      console.log("🤖 BALASAN DARI AI (POST):", data);
-      setStatus("Berhasil POST! AI sudah menjawab. Cek Console (F12)");
+      console.log("📝 BALASAN SIGN UP:", data);
+      
+      if(response.ok) {
+         setStatus(`Berhasil Daftar! ${data.pesan}`);
+      } else {
+         setStatus(`Gagal Daftar: ${data.pesan}`);
+      }
     } catch (error) {
-      console.error("Gagal POST:", error);
-      setStatus("Error POST! Cek terminal backend.");
+      console.error("Gagal Request:", error);
+      setStatus("Error! Cek terminal backend.");
     }
   };
 
+  // 2. Fungsi Tes Login
+  const tesLogin = async () => {
+    setStatus("Sedang mencoba masuk...");
+    try {
+      const response = await fetch("http://localhost:5000/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            email: dataPalsu.email,
+            password: dataPalsu.password
+        }),
+      });
+      
+      const data = await response.json();
+      console.log("🔐 BALASAN LOGIN:", data);
+      
+      if(response.ok) {
+        // SIMPAN TIKET MASUK (TOKEN) KE BROWSER!
+        localStorage.setItem('token', data.token);
+        setToken(data.token);
+        setStatus(`Berhasil Login! Halo ${data.dataUser.nama} (${data.dataUser.role})`);
+      } else {
+        setStatus(`Gagal Login: ${data.pesan}`);
+      }
+    } catch (error) {
+      console.error("Gagal Request:", error);
+      setStatus("Error! Cek terminal backend.");
+    }
+  };
+
+  // 3. Fungsi Logout (Keluar)
+  const tesLogout = () => {
+    localStorage.removeItem('token');
+    setToken(null);
+    setStatus("Berhasil Logout. Token dihapus.");
+  }
+
   return (
-    <div style={{ padding: "50px", fontFamily: "sans-serif" }}>
-      <h1>Tes Pipa Data Polnetics (TypeScript) 🚀</h1>
-      <div style={{ marginBottom: "20px" }}>
-        <button onClick={tesAmbilData} style={{ padding: "10px", marginRight: "10px", cursor: "pointer" }}>
-          Tes GET (Ambil Laporan)
+    <div style={{ padding: "30px", fontFamily: "sans-serif", border: "2px solid #333", margin: "20px" }}>
+      <h2>Tes Keamanan (Auth) 🛡️</h2>
+      
+      <div style={{ marginBottom: "15px" }}>
+         <p style={{ margin: "5px 0", fontSize: "14px", color: "gray"}}>*Mendaftar menggunakan akun: {dataPalsu.email}</p>
+        <button onClick={tesDaftar} style={{ padding: "8px", marginRight: "10px", cursor: "pointer" }}>
+          1. Tes Sign Up
         </button>
-        <button onClick={tesKirimData} style={{ padding: "10px", cursor: "pointer" }}>
-          Tes POST (Kirim Laporan ke AI)
+        <button onClick={tesLogin} style={{ padding: "8px", marginRight: "10px", cursor: "pointer" }}>
+          2. Tes Login
+        </button>
+        <button onClick={tesLogout} style={{ padding: "8px", cursor: "pointer", background: "#ff4d4d", color: "white" }}>
+          3. Logout
         </button>
       </div>
-      <p><strong>Status:</strong> {status}</p>
+      
+      <div style={{ background: "#f4f4f4", padding: "10px", borderRadius: "5px" }}>
+        <p><strong>Status:</strong> {status}</p>
+        <p><strong>Status Login:</strong> {token ? "✅ Sedang Login" : "❌ Belum Login"}</p>
+      </div>
     </div>
   );
 }
 
-export default App;
+export default TesAuth;
