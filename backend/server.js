@@ -120,6 +120,12 @@ app.post('/api/git/commit', async (req, res) => {
         await git.add('./*'); 
         const hasilCommit = await git.commit(pesanCommit);
 
+        // INI PENGERAS SUARANYA:
+        io.emit('notif-workspace', {
+            judul: "Pembaruan Disimpan! 📝",
+            pesan: `Ada yang baru saja melakukan Commit: "${pesanCommit}"`
+        });
+
         res.json({
             status: "sukses",
             pesan: "Berhasil melakukan commit dari aplikasi!",
@@ -139,6 +145,12 @@ app.post('/api/git/push', async (req, res) => {
 
         console.log(`Menjalankan git push ke branch ${branchTujuan}...`);
         await git.push('origin', branchTujuan);
+
+// INI PENGERAS SUARANYA:
+io.emit('notif-workspace', {
+    judul: "Kode Mengudara! 🚀",
+    pesan: `Kode terbaru telah di-push ke GitHub (Branch: ${branchTujuan})`
+});
 
         res.json({
             status: "sukses",
