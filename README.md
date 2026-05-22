@@ -1,3 +1,2 @@
 # Polnetics
 Hackathon UMKT
-tes
