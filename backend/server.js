@@ -154,6 +154,21 @@ app.post('/api/git/pull', async (req, res) => {
 });
 
 // ==========================================
+// FITUR 3: WEBHOOK (OTOMATISASI GITHUB)
+// ==========================================
+app.post('/api/webhook', async (req, res) => {
+    console.log("🔔 Sinyal dari GitHub masuk! Menarik kode terbaru otomatis...");
+    try {
+        await git.pull();
+        console.log("✅ Berhasil memperbarui kode di laptop secara otomatis!");
+        res.status(200).send("Webhook berhasil dieksekusi");
+    } catch (error) {
+        console.error("❌ Gagal pull otomatis:", error);
+        res.status(500).send("Gagal eksekusi webhook");
+    }
+});
+
+// ==========================================
 // MENYALAKAN SERVER
 // ==========================================
 app.listen(PORT, () => {
