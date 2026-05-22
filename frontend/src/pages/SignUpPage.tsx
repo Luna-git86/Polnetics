@@ -1,10 +1,20 @@
 import { useState } from 'react';
 import { Mail, Lock, User, ArrowRight, Zap } from 'lucide-react';
 
-const SignUpPage = () => {
+interface SignUpPageProps {
+  onSignup: () => void;
+  onGoToLogin: () => void;
+}
+
+const SignUpPage = ({ onSignup, onGoToLogin }: SignUpPageProps) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSignup(); // Langsung pindah ke halaman Room setelah daftar
+  };
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#F5F5F7] text-slate-900 font-sans selection:bg-[#0071E3]/20">
@@ -19,8 +29,7 @@ const SignUpPage = () => {
           <p className="text-[13px] text-slate-500 font-medium">Mulai kolaborasi bersama tim Anda</p>
         </div>
 
-        <form className="space-y-4">
-          {/* Tombol Google */}
+        <form className="space-y-4" onSubmit={handleSubmit}>
           <button type="button" className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-slate-200 rounded-[16px] hover:bg-slate-50 transition-colors mb-6 shadow-sm">
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -39,17 +48,17 @@ const SignUpPage = () => {
 
           <div className="relative">
             <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input type="text" placeholder="Nama Lengkap" className="w-full bg-[#F5F5F7] border border-transparent focus:border-slate-300 focus:bg-white py-3.5 pl-11 pr-4 rounded-[16px] outline-none transition-all text-[14px] font-medium text-slate-900 placeholder:text-slate-400" value={name} onChange={(e) => setName(e.target.value)} />
+            <input type="text" placeholder="Nama Lengkap" className="w-full bg-[#F5F5F7] border border-transparent focus:border-slate-300 focus:bg-white py-3.5 pl-11 pr-4 rounded-[16px] outline-none transition-all text-[14px] font-medium text-slate-900" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
 
           <div className="relative">
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input type="email" placeholder="Alamat Email" className="w-full bg-[#F5F5F7] border border-transparent focus:border-slate-300 focus:bg-white py-3.5 pl-11 pr-4 rounded-[16px] outline-none transition-all text-[14px] font-medium text-slate-900 placeholder:text-slate-400" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <input type="email" placeholder="Alamat Email" className="w-full bg-[#F5F5F7] border border-transparent focus:border-slate-300 focus:bg-white py-3.5 pl-11 pr-4 rounded-[16px] outline-none transition-all text-[14px] font-medium text-slate-900" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
 
           <div className="relative pb-2">
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input type="password" placeholder="Kata Sandi" className="w-full bg-[#F5F5F7] border border-transparent focus:border-slate-300 focus:bg-white py-3.5 pl-11 pr-4 rounded-[16px] outline-none transition-all text-[14px] font-medium text-slate-900 placeholder:text-slate-400" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <input type="password" placeholder="Kata Sandi" className="w-full bg-[#F5F5F7] border border-transparent focus:border-slate-300 focus:bg-white py-3.5 pl-11 pr-4 rounded-[16px] outline-none transition-all text-[14px] font-medium text-slate-900" value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
 
           <button type="submit" className="w-full py-3.5 bg-[#0071E3] text-white rounded-[16px] font-semibold text-[14px] flex items-center justify-center gap-2 shadow-sm hover:bg-[#005bb5] transition-all group">
@@ -59,7 +68,10 @@ const SignUpPage = () => {
         </form>
 
         <p className="text-center text-[13px] font-medium text-slate-500 mt-8">
-          Sudah punya akun? <a href="#" className="text-[#0071E3] font-semibold hover:underline">Masuk di sini</a>
+          Sudah punya akun?{' '}
+          <button onClick={onGoToLogin} className="text-[#0071E3] font-semibold hover:underline cursor-pointer">
+            Masuk di sini
+          </button>
         </p>
       </div>
     </div>
