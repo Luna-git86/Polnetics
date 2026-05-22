@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const { GoogleGenerativeAI } = require('@google/generative-ai'); 
@@ -10,6 +12,18 @@ const User = require('./models/User');
 const simpleGit = require('simple-git'); 
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: "*", // Mengizinkan semua user web untuk terhubung
+        methods: ["GET", "POST"]
+    }
+});
+
+// Menangkap user yang terhubung ke Workspace
+io.on('connection', (socket) => {
+    console.log(`🟢 User baru terhubung ke Workspace: ${socket.id}`);
+});
 const PORT = process.env.PORT || 5000;
 
 // Menunjuk ke folder proyek tempat Git berjalan ('../' artinya naik satu level)
@@ -181,6 +195,12 @@ app.post('/api/git/commit', async (req, res) => {
         await git.add('./*'); 
         const hasilCommit = await git.commit(pesanCommit);
 
+    // INI PENGERAS SUARANYA:
+    io.emit('notif-workspace', {
+        judul: "Pembaruan Disimpan! 📝",
+        pesan: `Ada yang baru saja melakukan Commit: "${pesanCommit}"`
+    });
+
         res.json({
             status: "sukses",
             pesan: "Berhasil melakukan commit dari aplikasi!",
@@ -199,7 +219,14 @@ app.post('/api/git/push', async (req, res) => {
         const branchTujuan = branch || 'main';
 
         console.log(`Menjalankan git push ke branch ${branchTujuan}...`);
-        await git.push('origin', branchTujuan);
+        // ... kode git.push
+await git.push('origin', branchTujuan);
+
+// INI PENGERAS SUARANYA:
+io.emit('notif-workspace', {
+    judul: "Kode Mengudara! 🚀",
+    pesan: `Kode terbaru telah di-push ke GitHub (Branch: ${branchTujuan})`
+});
 
         res.json({
             status: "sukses",
@@ -217,6 +244,12 @@ app.post('/api/git/pull', async (req, res) => {
         console.log("Menjalankan git pull...");
         const hasilPull = await git.pull();
 
+        // INI PENGERAS SUARANYA:
+        io.emit('notif-workspace', {
+            judul: "Sinkronisasi Berhasil! 🔄",
+            pesan: "Data terbaru telah ditarik (pull) ke dalam Workspace."
+        });
+
         res.json({
             status: "sukses",
             pesan: "Berhasil menarik data terbaru (pull) dari GitHub!",
@@ -228,17 +261,23 @@ app.post('/api/git/pull', async (req, res) => {
     }
 });
 
+
 // ==========================================
 // FITUR 3: WEBHOOK (OTOMATISASI GITHUB)
 // ==========================================
 app.post('/api/webhook', async (req, res) => {
-    console.log("🔔 Sinyal dari GitHub masuk! Menarik kode terbaru otomatis...");
+    console.log("🔔 Sinyal dari GitHub masuk!");
     try {
         await git.pull();
-        console.log("✅ Berhasil memperbarui kode di laptop secara otomatis!");
+        // INI PENGERAS SUARANYA:
+        io.emit('notif-workspace', { 
+            judul: "Pembaruan Git 🚀", 
+            pesan: "Ada pembaruan kode terbaru yang baru saja ditarik!" 
+        });
+        
+        console.log("✅ Berhasil pull dan sebar notif!");
         res.status(200).send("Webhook berhasil dieksekusi");
     } catch (error) {
-        console.error("❌ Gagal pull otomatis:", error);
         res.status(500).send("Gagal eksekusi webhook");
     }
 });
@@ -246,6 +285,6 @@ app.post('/api/webhook', async (req, res) => {
 // ==========================================
 // MENYALAKAN SERVER
 // ==========================================
-app.listen(PORT, () => {
-    console.log(`Server berjalan di http://localhost:${PORT}`);
+server.listen(PORT, () => {
+    console.log(`Server & WebSockets berjalan di http://localhost:${PORT}`);
 });
