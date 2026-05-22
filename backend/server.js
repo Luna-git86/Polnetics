@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const { GoogleGenerativeAI } = require('@google/generative-ai'); 
@@ -7,6 +9,18 @@ const Laporan = require('./models/Laporan');
 const simpleGit = require('simple-git'); // Tambahan: Panggil simple-git di atas
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: "*", // Mengizinkan semua user web untuk terhubung
+        methods: ["GET", "POST"]
+    }
+});
+
+// Menangkap user yang terhubung ke Workspace
+io.on('connection', (socket) => {
+    console.log(`🟢 User baru terhubung ke Workspace: ${socket.id}`);
+});
 const PORT = process.env.PORT || 5000;
 
 // Menunjuk ke folder proyek tempat Git berjalan ('../' artinya naik satu level)
@@ -157,13 +171,18 @@ app.post('/api/git/pull', async (req, res) => {
 // FITUR 3: WEBHOOK (OTOMATISASI GITHUB)
 // ==========================================
 app.post('/api/webhook', async (req, res) => {
-    console.log("🔔 Sinyal dari GitHub masuk! Menarik kode terbaru otomatis...");
+    console.log("🔔 Sinyal dari GitHub masuk!");
     try {
         await git.pull();
-        console.log("✅ Berhasil memperbarui kode di laptop secara otomatis!");
+        // INI PENGERAS SUARANYA:
+        io.emit('notif-workspace', { 
+            judul: "Pembaruan Git 🚀", 
+            pesan: "Ada pembaruan kode terbaru yang baru saja ditarik!" 
+        });
+        
+        console.log("✅ Berhasil pull dan sebar notif!");
         res.status(200).send("Webhook berhasil dieksekusi");
     } catch (error) {
-        console.error("❌ Gagal pull otomatis:", error);
         res.status(500).send("Gagal eksekusi webhook");
     }
 });
@@ -171,6 +190,6 @@ app.post('/api/webhook', async (req, res) => {
 // ==========================================
 // MENYALAKAN SERVER
 // ==========================================
-app.listen(PORT, () => {
-    console.log(`Server berjalan di http://localhost:${PORT}`);
+server.listen(PORT, () => {
+    console.log(`Server & WebSockets berjalan di http://localhost:${PORT}`);
 });
