@@ -2,12 +2,12 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
-const { GoogleGenerativeAI } = require('@google/generative-ai'); // Alat pemanggil Gemini
-const Laporan = require('./models/Laporan'); // Cetakan Buku Kasir
+const { GoogleGenerativeAI } = require('@google/generative-ai'); 
+const Laporan = require('./models/Laporan'); 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const User = require('./models/User'); // Memanggil model User
-const simpleGit = require('simple-git'); // Tambahan: Panggil simple-git di atas
+const User = require('./models/User'); 
+const simpleGit = require('simple-git'); 
 
 const app = express();
 const PORT = process.env.PORT || 5000;
