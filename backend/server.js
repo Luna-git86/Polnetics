@@ -259,7 +259,7 @@ app.post('/api/git/push', async (req, res) => {
 
         // Notifikasi Pop-up
         io.emit('notif-workspace', {
-            judul: "Kode Mengudara! 🚀",
+            judul: "Kode Menuju Github",
             pesan: `Kode terbaru telah di-push ke GitHub (Branch: ${branchTujuan})`
         });
 
@@ -267,7 +267,7 @@ app.post('/api/git/push', async (req, res) => {
         io.emit('git-activity', {
             user: namaUser || "System",
             action: 'Push',
-            pesan: `Menerbangkan kode ke branch ${branchTujuan}`,
+            pesan: `Mengirim kode ke branch ${branchTujuan}`,
             waktu: new Date()
         });
 
