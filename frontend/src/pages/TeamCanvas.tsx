@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mic, Sparkles, Video, MoreHorizontal, Calendar, CheckCircle2, CircleDashed, AlertTriangle, GitBranch, UserCircle2, Zap } from 'lucide-react';
+import { Mic, Sparkles, Video, MoreHorizontal, CheckCircle2, CircleDashed, AlertTriangle, GitBranch, UserCircle2, Zap } from 'lucide-react';
 import { io } from 'socket.io-client';
 
 interface TeamCanvasProps {
@@ -19,7 +19,7 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
 
   // === STATE LOG AKTIVITAS & LAPORAN ===
   const [aktivitasGit, setAktivitasGit] = useState<any[]>([]);
-  const [laporanTim, setLaporanTim] = useState<any[]>([]); // Menyimpan laporan standup terbaru
+  const [laporanTim, setLaporanTim] = useState<any[]>([]);
 
   // === AMBIL DATA & DENGARKAN PERUBAHAN SECARA REAL-TIME ===
   useEffect(() => {
@@ -40,7 +40,6 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
       setAktivitasGit(JSON.parse(riwayatGitTersimpan));
     }
 
-    // Fungsi mengambil laporan terbaru untuk Tooltip
     const fetchLaporanTim = async () => {
       if (!workspaceIdAktif) return;
       try {
@@ -56,7 +55,7 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
 
     fetchLaporanTim();
 
-   const socket = io('http://localhost:5000', );
+   const socket = io('http://localhost:5000');
 
     socket.on('workspace-updated', (updatedWorkspace: any) => {
       if (workspaceIdAktif && updatedWorkspace._id === workspaceIdAktif) {
@@ -73,7 +72,6 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
       });
     });
 
-    // Dengarkan laporan baru agar tooltip update real-time
     socket.on('laporan-baru', () => {
       fetchLaporanTim();
     });
@@ -155,6 +153,7 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
 
   return (
     <div className="flex h-full gap-8 animate-in fade-in duration-500 font-sans text-slate-900">
+      {/* KANVAS UTAMA */}
       <div className="flex-1 bg-white rounded-[32px] border border-black/[0.04] shadow-[0_8px_30px_rgb(0,0,0,0.03)] relative flex flex-col overflow-hidden p-8">
         <div className="absolute inset-0 z-0 opacity-[0.15]" style={{ backgroundImage: "radial-gradient(#000000 1px, transparent 1px)", backgroundSize: "24px 24px" }}></div>
 
@@ -193,13 +192,11 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
               const pos = hitungPosisiNode(i, members.length);
               const style = visualStyles[i % visualStyles.length];
               
-              // Cari laporan terbaru dari array (karena dari server sudah ter-sort tanggalPembuatan: -1)
               const historiUser = laporanTim.find(lap => lap.nama === member.nama);
               
               return (
                 <div key={`node-${i}`} className="absolute flex flex-col items-center group z-10" style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }}>
                   
-                  {/* Tooltip Dinamis Histori Standup */}
                   <div className="absolute bottom-full mb-4 w-72 bg-white/95 backdrop-blur-md rounded-[20px] p-5 shadow-[0_16px_50px_rgb(0,0,0,0.12)] border border-black/[0.04] opacity-0 group-hover:opacity-100 group-hover:-translate-y-2 transition-all duration-300 pointer-events-none z-50">
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex items-center gap-2">
@@ -245,17 +242,9 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
         </div>
       </div>
 
+      {/* SIDEBAR KANAN */}
       <div className="w-80 flex flex-col gap-6 h-full">
-        {/* ... (Sidebar Review & Git Activities tetap sama) ... */}
-        <div className="bg-white rounded-[24px] p-6 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] relative overflow-hidden shrink-0">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[#0071E3]/10 to-transparent rounded-bl-full pointer-events-none"></div>
-          <div className="flex items-center gap-3 text-[#0071E3] mb-4">
-            <Calendar size={18} /> <span className="text-[13px] font-semibold tracking-wide uppercase">Next Event</span>
-          </div>
-          <h3 className="text-xl font-semibold tracking-tight text-slate-900 mb-1">Sprint Review</h3>
-          <p className="text-[13px] text-slate-500 font-medium mb-6">Today, 14:00 PM - 15:30 PM</p>
-          <button onClick={onJoinMeeting} className="w-full py-3 bg-[#F5F5F7] hover:bg-slate-200 text-slate-900 text-[13px] font-semibold rounded-[16px] transition-all active:scale-95 flex items-center justify-center gap-2">Join Meeting Space</button>
-        </div>
+        {/* Kotak Sprint Review telah dihapus dari sini */}
 
         <div className="bg-white rounded-[24px] p-6 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex-1 overflow-y-auto custom-scrollbar">
           <div className="flex justify-between items-center mb-6">
