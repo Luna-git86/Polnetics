@@ -56,7 +56,7 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
 
     fetchLaporanTim();
 
-   const socket = io('https://abcd-123.ngrok-free.dev');
+   const socket = io('http://localhost:5000', );
 
     socket.on('workspace-updated', (updatedWorkspace: any) => {
       if (workspaceIdAktif && updatedWorkspace._id === workspaceIdAktif) {
@@ -133,7 +133,7 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
 
     try {
       setIsSending(true);
-     const response = await fetch("https://abcd-123.ngrok-free.dev/api/laporan",  {
+     const response = await fetch("http://localhost:5000/api/laporan",  {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
