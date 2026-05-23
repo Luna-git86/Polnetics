@@ -207,11 +207,7 @@ const TeamAnalytics = () => {
       {/* --- Panel Grafik Tren AI --- */}
       <div className="bg-white p-8 rounded-2xl border border-slate-200/60 shadow-xs">
         <div className="mb-8">
-          <h3 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
-            <Zap size={18} className="text-[#0071E3] fill-[#0071E3]" />
-            AI Agile Risk Analytics
-          </h3>
-          <p className="text-slate-500 text-[13px] mt-1">
+          <p className="text-slate-500 text-[20px] mt-1">
             Pelacakan algoritma metrik kelelahan (Fatigue), motivasi, dan kecepatan rilis tim berdasarkan bahasa alami.
           </p>
         </div>
