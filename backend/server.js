@@ -442,6 +442,42 @@ app.put('/api/workspace/role', async (req, res) => {
     }
 });
 
+// 4. KELUAR DARI WORKSPACE (LEAVE)
+app.post('/api/workspace/leave', async (req, res) => {
+    try {
+        const { workspaceId, userId } = req.body;
+
+        const workspace = await Workspace.findById(workspaceId);
+        if (!workspace) return res.status(404).json({ status: "gagal", pesan: "Workspace tidak ditemukan!" });
+
+        // Cek apakah user yang mau keluar adalah satu-satunya 'Owner'
+        const isOwner = workspace.anggota.find(m => m.user.toString() === userId)?.role === 'Owner';
+        const ownerCount = workspace.anggota.filter(m => m.role === 'Owner').length;
+
+        if (isOwner && ownerCount === 1) {
+            return res.status(400).json({ 
+                status: "gagal", 
+                pesan: "Kamu adalah satu-satunya Owner! Berikan role Owner ke orang lain terlebih dahulu sebelum keluar." 
+            });
+        }
+
+        // Hapus user dari daftar anggota
+        workspace.anggota = workspace.anggota.filter(m => m.user.toString() !== userId);
+        await workspace.save();
+
+        // Beri tahu anggota lain secara real-time bahwa ada yang keluar
+        io.emit('workspace-updated', workspace);
+        io.emit('notif-workspace', {
+            judul: "Anggota Berkurang 👋",
+            pesan: "Seseorang telah meninggalkan Workspace."
+        });
+
+        res.json({ status: "sukses", pesan: "Berhasil keluar dari Workspace." });
+    } catch (error) {
+        res.status(500).json({ status: "gagal", pesan: error.message });
+    }
+});
+
 // ==========================================
 // MENYALAKAN SERVER
 // ==========================================

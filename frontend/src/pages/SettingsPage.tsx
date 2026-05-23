@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { User, Shield, Paintbrush, ChevronRight, Users, AlertCircle, CheckCircle2 } from 'lucide-react';
 
+
 const SettingsPage = () => {
+
   const [activeMenu, setActiveMenu] = useState('Profil');
   
   // State untuk menampung data user & workspace dari local storage
@@ -57,12 +59,46 @@ const SettingsPage = () => {
       const result = await response.json();
 
       if (response.ok && result.status === 'sukses') {
-        // Perbarui state lokal dan brankas browser agar UI langsung update tanpa refresh
         setWorkspaceData(result.data);
         localStorage.setItem('activeWorkspace', JSON.stringify(result.data));
         showNotif('sukses', result.pesan);
       } else {
         showNotif('gagal', result.pesan || 'Gagal mengubah role anggota.');
+      }
+    } catch (error) {
+      showNotif('gagal', 'Terjadi kesalahan koneksi ke server.');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // --- FUNGSI KELUAR DARI WORKSPACE ---
+  const handleLeaveWorkspace = async () => {
+    const konfirmasi = window.confirm("Apakah kamu yakin ingin keluar dari workspace ini? Kamu akan membutuhkan kode invite baru jika ingin masuk kembali.");
+    if (!konfirmasi) return;
+
+    try {
+      setIsUpdating(true);
+      const payload = {
+        workspaceId: workspaceData._id,
+        userId: userData._id || userData.id
+      };
+
+      const response = await fetch('http://localhost:5000/api/workspace/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.status === 'sukses') {
+        // Hapus ruang aktif dari brankas browser
+        localStorage.removeItem('activeWorkspace');
+        // Gunakan hard-reload agar dashboard benar-benar bersih dan kembali ke ruang pemilihan
+        window.location.href = '/room'; 
+      } else {
+        showNotif('gagal', result.pesan || 'Gagal keluar dari workspace.');
       }
     } catch (error) {
       showNotif('gagal', 'Terjadi kesalahan koneksi ke server.');
@@ -121,7 +157,7 @@ const SettingsPage = () => {
         {/* Konten Kanan */}
         <div className="col-span-1 md:col-span-2 space-y-6">
           
-          {/* TAB: PROFIL (TETAP SAMA) */}
+          {/* TAB: PROFIL */}
           {activeMenu === 'Profil' && (
             <div className="bg-white rounded-[24px] p-8 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] animate-in fade-in">
               <h3 className="text-lg font-semibold tracking-tight text-slate-900 mb-6">Informasi Pribadi</h3>
@@ -157,7 +193,7 @@ const SettingsPage = () => {
             </div>
           )}
 
-          {/* TAB: MANAJEMEN ANGGOTA (FITUR BARU) */}
+          {/* TAB: MANAJEMEN ANGGOTA */}
           {activeMenu === 'Anggota' && (
             <div className="bg-white rounded-[24px] p-8 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] animate-in fade-in">
               <div className="flex justify-between items-end mb-6">
@@ -186,7 +222,6 @@ const SettingsPage = () => {
                   const isTargetOwner = member.role === 'Owner';
                   const isAdminMencobaUbahOwner = currentUserWorkspaceRole === 'Admin' && isTargetOwner;
                   
-                  // Disable dropdown jika: bukan admin/owner, atau sedang mengupdate, atau mencoba mengubah role diri sendiri, atau admin mencoba mengubah role owner
                   const isDisabled = !hasAccessToManage || isUpdating || isSatuOrangSama || isAdminMencobaUbahOwner;
 
                   return (
@@ -203,7 +238,7 @@ const SettingsPage = () => {
                         </div>
                       </div>
 
-                      {/* Dropdown Role */}
+                      {/* Dropdown Role Gabungan */}
                       <select 
                         value={member.role}
                         onChange={(e) => handleUbahRole(targetId, e.target.value)}
@@ -235,12 +270,30 @@ const SettingsPage = () => {
                   );
                 })}
               </div>
+
+              {/* === ZONA BERBAHAYA: KELUAR WORKSPACE === */}
+              <div className="mt-10 pt-6 border-t border-slate-100">
+                <h4 className="text-[13px] font-bold text-red-600 uppercase tracking-wider mb-3">Zona Berbahaya</h4>
+                <div className="flex items-center justify-between p-4 bg-red-50/50 border border-red-100 rounded-[16px]">
+                  <div>
+                    <h5 className="text-[14px] font-bold text-red-700">Tinggalkan Workspace</h5>
+                    <p className="text-[12px] text-red-600/80 mt-0.5">Aksesmu ke proyek ini akan dicabut seketika. Kamu butuh kode invite untuk kembali.</p>
+                  </div>
+                  <button 
+                    onClick={handleLeaveWorkspace} 
+                    disabled={isUpdating} 
+                    className="px-5 py-2.5 bg-red-100 text-red-700 hover:bg-red-600 hover:text-white text-[12px] font-bold rounded-xl transition-colors disabled:opacity-50"
+                  >
+                    Keluar Workspace
+                  </button>
+                </div>
+              </div>
+
             </div>
           )}
 
-          {/* TAB: KEAMANAN (TETAP SAMA) */}
+          {/* TAB: KEAMANAN */}
           {activeMenu === 'Keamanan' && (
-             // ... [Bisa diisi sisa kode tab keamanan lama] ...
             <div className="bg-white rounded-[24px] p-8 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] animate-in fade-in">
               <h3 className="text-lg font-semibold tracking-tight text-slate-900 mb-6">Keamanan Akun</h3>
               <div className="space-y-4 mb-8">
@@ -261,9 +314,8 @@ const SettingsPage = () => {
             </div>
           )}
 
-          {/* TAB: TAMPILAN (TETAP SAMA) */}
+          {/* TAB: TAMPILAN */}
           {activeMenu === 'Tampilan' && (
-            // ... [Bisa diisi sisa kode tab tampilan lama] ...
             <div className="bg-white rounded-[24px] p-8 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] animate-in fade-in">
               <h3 className="text-lg font-semibold tracking-tight text-slate-900 mb-6">Tema Aplikasi</h3>
               <div className="flex gap-6 mb-8">
