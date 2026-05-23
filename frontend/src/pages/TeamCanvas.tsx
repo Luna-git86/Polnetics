@@ -43,6 +43,14 @@ const TeamCanvas = ({ onJoinMeeting }: TeamCanvasProps) => {
 
     // 3. KONEKSI SOCKET UNTUK REAL-TIME UPDATE
     const socket = io('http://localhost:5000');
+    
+    // TAMBAHKAN BARIS INI
+    socket.connect(); 
+
+    socket.on('connect', () => {
+      console.log("Socket terhubung dengan ID:", socket.id);
+    });
+    // ... sisa kode lainnya ...
 
     // Mendengarkan Anggota Baru
     socket.on('workspace-updated', (updatedWorkspace: any) => {
