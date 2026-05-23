@@ -1,197 +1,345 @@
-import { useEffect, useState } from 'react';
-import { CheckCircle2, AlertTriangle, Activity, ChevronRight, Zap, Lightbulb, Clock } from 'lucide-react';
+import { useState, useEffect } from "react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} from "recharts";
+import { Zap, AlertTriangle, TrendingUp, Activity, CheckCircle2, CircleDashed, Clock, LineChart as ChartIcon } from "lucide-react";
+import { io } from "socket.io-client";
+
+// === KOMPONEN BARU: Tooltip Kustom Agar Mudah Dimengerti Orang Awam ===
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-white/95 backdrop-blur-md p-4 border border-slate-200/60 shadow-[0_10px_40px_rgba(0,0,0,0.08)] rounded-2xl text-xs min-w-[220px] animate-in zoom-in-95 duration-200">
+        <div className="mb-3 border-b border-slate-100 pb-2">
+          <p className="font-bold text-slate-800 text-[14px]">{data.namaLengkap}</p>
+          <p className="text-slate-500 font-medium mt-1 flex items-center gap-1">
+            <Clock size={12} /> {data.waktuPenuh}
+          </p>
+        </div>
+        <div className="space-y-2.5">
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center justify-between">
+              <span style={{ color: entry.color }} className="font-semibold flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></div>
+                {entry.name}
+              </span>
+              <span className="font-bold text-slate-800 text-[13px]">
+                {entry.value}{entry.name === 'Kecepatan' ? ' pts' : '%'}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 const TeamAnalytics = () => {
-  // === STATE APLIKASI ===
-  const [semuaLaporan, setSemuaLaporan] = useState<any[]>([]);
-  const [anggotaKesusahan, setAnggotaKesusahan] = useState<any[]>([]);
-  const [anggotaSelesai, setAnggotaSelesai] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [dataGrafik, setDataGrafik] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [riskSummary, setRiskSummary] = useState({ fatigue: 0, velocity: 0, motivation: 0, hasBlocker: false });
+  const [activeTasks, setActiveTasks] = useState<any[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<any[]>([]);
 
-  // === FUNGSI MENYEDOT DATA DARI SERVER.JS ===
   useEffect(() => {
-    const fetchLaporan = async () => {
+    const ambilDataLaporan = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/laporan');
-        const result = await response.json();
+        const dataWorkspaceRaw = localStorage.getItem('activeWorkspace');
+        const workspaceIdAktif = dataWorkspaceRaw ? JSON.parse(dataWorkspaceRaw)._id : null;
         
-        if (result.data) {
-          const dataAsli = result.data.reverse(); // Yang terbaru di atas
-          setSemuaLaporan(dataAsli);
+        if (!workspaceIdAktif) {
+          setLoading(false);
+          return;
+        }
 
-          // === LOGIKA AI SEDERHANA (PENYORTIRAN OTOMATIS) ===
-          // Memisahkan siapa yang "Stuck/Kesusahan" dan siapa yang "Aman/Selesai"
-          // Berdasarkan kata kunci pada teks laporan atau hasil analisis AI
-          const butuhBantuan = dataAsli.filter((lap: any) => 
-            lap.teksLaporan.toLowerCase().match(/kendala|error|bug|susah|hambatan|gagal|stuck/i) || 
-            (lap.hasilAnalisis && lap.hasilAnalisis.toLowerCase().match(/risiko tinggi|bantu/i))
-          );
+        const url = `http://localhost:5000/api/laporan/${workspaceIdAktif}`;
+        const response = await fetch(url, { cache: 'no-store' });
+        const hasil = await response.json();
 
-          const sudahSelesai = dataAsli.filter((lap: any) => 
-            lap.teksLaporan.toLowerCase().match(/selesai|berhasil|aman|done|sukses|lancar/i) &&
-            !butuhBantuan.includes(lap) // Pastikan tidak masuk daftar kesusahan
-          );
+        if (response.ok && hasil.data) {
+          if (hasil.data.length > 0) {
+            
+            // 1. PERBAIKAN FORMAT GRAFIK (NAMA + TANGGAL)
+            const formatDataGrafik = hasil.data.map((item: any) => {
+              // Olah tanggal agar ramah dibaca
+              const tgl = item.tanggalPembuatan ? new Date(item.tanggalPembuatan) : new Date();
+              const formatTanggal = tgl.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+              const formatJam = tgl.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+              
+              // Ambil nama depan saja untuk sumbu X agar tidak kepanjangan
+              const namaDepan = item.nama ? item.nama.split(' ')[0] : 'Tim';
 
-          setAnggotaKesusahan(butuhBantuan);
-          setAnggotaSelesai(sudahSelesai);
+              return {
+                labelSumbuX: `${namaDepan} (${formatTanggal})`, // Tampil di grafik: "Wicak (23 Mei)"
+                namaLengkap: item.nama || 'Anonim',
+                waktuPenuh: `${formatTanggal}, ${formatJam} WITA`, // Tampil di hover box
+                velocity: item.hasilAI?.metrics?.velocity || 50,
+                fatigue: item.hasilAI?.metrics?.fatigue || 30,
+                motivation: item.hasilAI?.metrics?.motivation || 70,
+              };
+            }).reverse(); // Dibalik agar urut dari waktu terlama (kiri) ke terbaru (kanan)
+            
+            setDataGrafik(formatDataGrafik);
+
+            // 2. SET KARTU RINGKASAN EVALUASI AI
+            const laporanTerakhir = hasil.data[0];
+            setRiskSummary({
+              fatigue: laporanTerakhir.hasilAI?.metrics?.fatigue || 0,
+              velocity: laporanTerakhir.hasilAI?.metrics?.velocity || 0,
+              motivation: laporanTerakhir.hasilAI?.metrics?.motivation || 0,
+              hasBlocker: laporanTerakhir.hasilAI?.blocker?.hasBlocker || false
+            });
+
+            // 3. LOGIKA MAGIC SPRINT BOARD
+            const aktif: any[] = [];
+            const selesai: any[] = [];
+
+            hasil.data.forEach((item: any) => {
+              const ai = item.hasilAI;
+              if (!ai) return;
+
+              if (ai.pastProgress?.deskripsi && ai.pastProgress.deskripsi.toLowerCase() !== "tidak ada") {
+                selesai.push({
+                  id: `${item._id}-done`,
+                  nama: item.nama || "Anonim",
+                  role: item.role || "developer", 
+                  deskripsi: ai.pastProgress.deskripsi,
+                  tanggal: item.tanggalPembuatan ? new Date(item.tanggalPembuatan).toLocaleDateString('id-ID') : "Baru saja"
+                });
+              }
+
+              if (ai.currentTarget?.deskripsi && ai.currentTarget.deskripsi.toLowerCase() !== "tidak ada") {
+                aktif.push({
+                  id: `${item._id}-active`,
+                  nama: item.nama || "Anonim",
+                  role: item.role || "developer",
+                  deskripsi: ai.currentTarget.deskripsi,
+                  tanggal: item.tanggalPembuatan ? new Date(item.tanggalPembuatan).toLocaleDateString('id-ID') : "Hari ini"
+                });
+              }
+            });
+
+            setActiveTasks(aktif);
+            setCompletedTasks(selesai);
+          } else {
+            // 4. KONDISI KOSONG
+            setDataGrafik([]);
+            setRiskSummary({ fatigue: 0, velocity: 0, motivation: 0, hasBlocker: false });
+            setActiveTasks([]);
+            setCompletedTasks([]);
+          }
         }
       } catch (error) {
-        console.error("Gagal terhubung ke database:", error);
+        console.error("Gagal memuat sistem analitik papan:", error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    fetchLaporan();
+    ambilDataLaporan();
+
+    const socket = io('http://localhost:5000');
+    socket.on('laporan-baru', () => {
+      ambilDataLaporan();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
+  if (loading) {
+    return <div className="flex h-64 items-center justify-center text-sm font-medium text-slate-500">Menghubungkan ke AI Engine Proyek... ⏳</div>;
+  }
+
+  const isWorkspaceBaru = dataGrafik.length === 0;
+
   return (
-    <div className="animate-in fade-in duration-300 font-sans pb-10">
+    <div className="space-y-8 animate-fade-in pb-10">
       
-      {/* --- HEADER --- */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-[#0071E3]">
-            <Activity size={24} />
+      {/* --- Barisan Kartu Metrik --- */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-xs">
+          <div className="flex justify-between items-start">
+            <span className="text-sm font-medium text-slate-500">Burnout Risk (Fatigue)</span>
+            <div className={`p-2 rounded-lg ${riskSummary.fatigue > 60 ? 'bg-red-50 text-red-600' : 'bg-slate-50 text-slate-600'}`}>
+              <Activity size={16} />
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">AI Team Analytics</h1>
-            <p className="text-sm text-slate-500">Live monitoring dari Sync Canva AI</p>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-slate-900">{riskSummary.fatigue}%</span>
+            <span className={`text-xs font-semibold ${isWorkspaceBaru ? 'text-slate-400' : (riskSummary.fatigue > 60 ? 'text-red-600' : 'text-green-600')}`}>
+              {isWorkspaceBaru ? "Belum ada data" : (riskSummary.fatigue > 60 ? "⚠️ Risiko Tinggi" : "✓ Aman")}
+            </span>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-full text-sm font-semibold text-slate-600 shadow-sm">
-          <Clock size={16} className="text-[#0071E3]" />
-          Update Real-time
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-xs">
+          <div className="flex justify-between items-start">
+            <span className="text-sm font-medium text-slate-500">Team Velocity</span>
+            <div className={`p-2 rounded-lg ${isWorkspaceBaru ? 'bg-slate-50 text-slate-400' : 'bg-cyan-50 text-[#0071E3]'}`}>
+              <TrendingUp size={16} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-slate-900">{riskSummary.velocity} pts</span>
+            <span className="text-xs text-slate-500 font-medium">Produktifitas</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-xs">
+          <div className="flex justify-between items-start">
+            <span className="text-sm font-medium text-slate-500">Blocker Status</span>
+            <div className={`p-2 rounded-lg ${isWorkspaceBaru ? 'bg-slate-50 text-slate-400' : (riskSummary.hasBlocker ? 'bg-amber-50 text-amber-600' : 'bg-green-50 text-green-600')}`}>
+              <AlertTriangle size={16} />
+            </div>
+          </div>
+          <div className="mt-4 flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-slate-900">
+              {isWorkspaceBaru ? "Standby" : (riskSummary.hasBlocker ? "Ada Hambatan" : "Lancar Jaya")}
+            </span>
+          </div>
         </div>
       </div>
 
-      {isLoading ? (
-        // --- LOADING STATE ---
-        <div className="flex flex-col items-center justify-center h-64 bg-white rounded-3xl border border-slate-100 shadow-sm">
-          <Zap className="animate-pulse text-[#0071E3] mb-3" size={32} />
-          <p className="text-slate-500 font-medium text-sm">AI sedang membaca database tim...</p>
+      {/* --- Panel Grafik Tren AI --- */}
+      <div className="bg-white p-8 rounded-2xl border border-slate-200/60 shadow-xs">
+        <div className="mb-8">
+          <h3 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-2">
+            <Zap size={18} className="text-[#0071E3] fill-[#0071E3]" />
+            AI Agile Risk Analytics
+          </h3>
+          <p className="text-slate-500 text-[13px] mt-1">
+            Pelacakan algoritma metrik kelelahan (Fatigue), motivasi, dan kecepatan rilis tim berdasarkan bahasa alami.
+          </p>
         </div>
-      ) : (
-        <>
-          {/* --- AI INSIGHT WIDGET (Rekomendasi Cerdas) --- */}
-          <div className="bg-gradient-to-r from-[#0071E3] to-[#005bb5] rounded-3xl p-6 mb-8 text-white shadow-lg relative overflow-hidden">
-            <Zap className="absolute right-[-20px] top-[-20px] w-48 h-48 text-white opacity-10" />
-            <div className="flex items-start gap-4 relative z-10">
-              <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm">
-                <Lightbulb size={28} className="text-white" />
+        
+        <div className="h-[340px] w-full relative">
+          {!isWorkspaceBaru ? (
+            <ResponsiveContainer width="100%" height="100%">
+              {/* Tambahkan margin khusus agar garis tidak menabrak batas kiri-kanan container */}
+              <LineChart data={dataGrafik} margin={{ top: 10, right: 30, left: -20, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="4 4" stroke="#f1f5f9" vertical={false} />
+                
+                {/* Sumbu X kini menggunakan labelSumbuX (Nama + Tanggal) dengan padding agar ke tengah */}
+                <XAxis 
+                  dataKey="labelSumbuX" 
+                  stroke="#94a3b8" 
+                  fontSize={11} 
+                  fontWeight={600}
+                  tickLine={false} 
+                  axisLine={false}
+                  dy={10} // Jarak teks dengan garis
+                  padding={{ left: 40, right: 40 }} 
+                />
+                
+                <YAxis 
+                  stroke="#94a3b8" 
+                  fontSize={11} 
+                  fontWeight={500}
+                  tickLine={false} 
+                  axisLine={false}
+                  domain={[0, 100]} 
+                  dx={-10}
+                />
+                
+                {/* Ganti Tooltip bawaan Recharts dengan CustomTooltip milik kita */}
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#e2e8f0', strokeWidth: 2, strokeDasharray: '4 4' }} />
+                
+                <Legend verticalAlign="top" height={40} iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569' }} />
+                
+                {/* Pengaturan Line dibuat lebih tebal dan mulus */}
+                <Line type="monotone" dataKey="velocity" stroke="#0071E3" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6, strokeWidth: 0 }} name="Kecepatan" />
+                <Line type="monotone" dataKey="fatigue" stroke="#FF3B30" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6, strokeWidth: 0 }} name="Risiko Burnout" />
+                <Line type="monotone" dataKey="motivation" stroke="#34C759" strokeWidth={2} strokeDasharray="6 4" dot={{ r: 3 }} activeDot={{ r: 5 }} name="Motivasi" />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-100 rounded-xl bg-slate-50/50">
+              <div className="w-16 h-16 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-slate-100 flex items-center justify-center mb-4">
+                <ChartIcon size={28} className="text-[#0071E3]/40" />
               </div>
-              <div>
-                <h2 className="text-lg font-bold mb-1">AI Executive Summary</h2>
-                <p className="text-blue-100 text-sm leading-relaxed max-w-3xl">
-                  {anggotaKesusahan.length > 0 
-                    ? `Ada ${anggotaKesusahan.length} anggota tim yang sedang menghadapi hambatan. Segera koordinasikan bantuan untuk menjaga produktivitas Sprint hari ini.` 
-                    : `Luar biasa! Tidak ada anggota tim yang melaporkan hambatan kritis hari ini. ${anggotaSelesai.length} tugas berhasil diselesaikan dengan baik.`}
-                </p>
-              </div>
+              <h4 className="text-sm font-bold text-slate-600 mb-1">Visualisasi Belum Tersedia</h4>
+              <p className="text-[13px] text-slate-400 max-w-xs text-center leading-relaxed">
+                Grafik akan terbentuk secara otomatis untuk memetakan sentimen tim setelah laporan standup pertama dikirim.
+              </p>
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* --- Papan Kanban --- */}
+      {/* ... (Sisa kode Kanban tidak berubah, biarkan tetap sama seperti sebelumnya) ... */}
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-slate-800 tracking-tight">Magic Sprint Board</h3>
+            <p className="text-slate-500 text-sm mt-1">Sistem papan manajemen tugas ter-update otomatis murni dari ucapan lisan tim.</p>
           </div>
+          <span className="px-3 py-1 bg-[#0071E3]/10 text-[#0071E3] text-[10px] font-bold uppercase tracking-widest rounded-full flex items-center gap-1.5">
+            <Zap size={12} className="fill-[#0071E3]"/> AI Orkestrasi
+          </span>
+        </div>
 
-          {/* --- GRID HIGHLIGHT (Kesusahan vs Selesai) --- */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            
-            {/* KOTAK MERAH: Butuh Bantuan */}
-            <div className="bg-white border border-red-100 rounded-3xl p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <AlertTriangle size={20} className="text-red-500" />
-                <h2 className="text-base font-bold text-slate-800">Needs Attention (Blocked)</h2>
-                <span className="ml-auto bg-red-100 text-red-600 px-2.5 py-0.5 rounded-full text-xs font-bold">
-                  {anggotaKesusahan.length} Anggota
-                </span>
-              </div>
-              
-              <div className="space-y-3">
-                {anggotaKesusahan.length === 0 ? (
-                  <p className="text-sm text-slate-400 italic">Semua anggota aman, tidak ada kendala.</p>
-                ) : (
-                  anggotaKesusahan.map((lap, i) => (
-                    <div key={i} className="p-3 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-red-200 text-red-700 flex items-center justify-center text-xs font-bold shrink-0">
-                        {lap.nama?.substring(0,2).toUpperCase() || 'AI'}
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800">{lap.nama}</h4>
-                        <p className="text-xs text-red-600 mt-0.5 line-clamp-2">{lap.teksLaporan}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* KOTAK HIJAU: Sudah Selesai */}
-            <div className="bg-white border border-emerald-100 rounded-3xl p-6 shadow-sm">
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle2 size={20} className="text-[#34C759]" />
-                <h2 className="text-base font-bold text-slate-800">Completed (On Track)</h2>
-                <span className="ml-auto bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full text-xs font-bold">
-                  {anggotaSelesai.length} Tugas
-                </span>
-              </div>
-              
-              <div className="space-y-3">
-                {anggotaSelesai.length === 0 ? (
-                  <p className="text-sm text-slate-400 italic">Belum ada tugas yang dilaporkan selesai.</p>
-                ) : (
-                  anggotaSelesai.map((lap, i) => (
-                    <div key={i} className="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center text-xs font-bold shrink-0">
-                        {lap.nama?.substring(0,2).toUpperCase() || 'AI'}
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800">{lap.nama}</h4>
-                        <p className="text-xs text-emerald-700 mt-0.5 line-clamp-2">{lap.teksLaporan}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-          </div>
-
-          {/* --- LOG LAPORAN LENGKAP --- */}
-          <h2 className="text-lg font-bold text-slate-800 mb-4">Semua Log Laporan Hari Ini</h2>
-          <div className="bg-white border border-slate-200 rounded-3xl p-2 shadow-sm">
-            {semuaLaporan.length === 0 ? (
-              <div className="p-8 text-center text-slate-500 text-sm">Data laporan kosong.</div>
-            ) : (
-              semuaLaporan.map((laporan, index) => (
-                <div key={index} className="group flex items-start justify-between p-4 hover:bg-[#F5F5F7] rounded-2xl transition-colors cursor-pointer border-b border-slate-50 last:border-0">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold bg-slate-100 text-slate-600 border border-slate-200 shrink-0 mt-1">
-                      {laporan.nama ? laporan.nama.substring(0, 2).toUpperCase() : 'AI'}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="text-sm font-bold text-slate-800">{laporan.nama}</h4>
-                        <span className="text-[11px] text-slate-400">
-                          {laporan.createdAt ? new Date(laporan.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Hari ini'}
-                        </span>
-                      </div>
-                      <p className="text-[13px] text-slate-600 leading-relaxed max-w-3xl mb-2">{laporan.teksLaporan}</p>
-                      
-                      {laporan.hasilAnalisis && (
-                        <div className="p-3 bg-blue-50/50 border border-blue-100 rounded-xl inline-block mt-1">
-                          <p className="text-[12px] text-slate-700 leading-relaxed flex items-start gap-2">
-                            <Zap size={14} className="text-[#0071E3] shrink-0 mt-0.5" />
-                            <span><span className="font-bold text-[#0071E3]">Analisis AI:</span> {laporan.hasilAnalisis.replace('(DUMMY MODE)', '').trim()}</span>
-                          </p>
-                        </div>
-                      )}
-                    </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-200/60 min-h-[250px]">
+            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-4">
+              <CircleDashed size={16} className="text-[#0071E3]" /> Target Hari Ini (Active Sprint)
+            </h4>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {activeTasks.length > 0 ? activeTasks.map((task) => (
+                <div key={task.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-[#0071E3]/30 transition-colors">
+                  <p className="text-sm font-medium text-slate-800 leading-snug">{task.deskripsi}</p>
+                  <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <div className="w-5 h-5 bg-slate-100 rounded-full flex items-center justify-center text-[9px] text-[#0071E3] border border-slate-200 font-bold">
+                        {(task.nama || "A").charAt(0).toUpperCase()}
+                      </div> 
+                      <span className="text-slate-700">{task.nama}</span>
+                      <span className="text-slate-400 text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-mono uppercase">({task.role})</span>
+                    </span>
+                    <span className="flex items-center gap-1"><Clock size={10} /> {task.tanggal}</span>
                   </div>
-                  <ChevronRight size={16} className="text-slate-300 group-hover:text-[#0071E3] mt-2 transition-colors" />
                 </div>
-              ))
-            )}
+              )) : (
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <p className="text-xs text-slate-400 font-medium">Belum ada target penugasan aktif.</p>
+                </div>
+              )}
+            </div>
           </div>
-        </>
-      )}
+
+          <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-200/60 min-h-[250px]">
+            <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-4">
+              <CheckCircle2 size={16} className="text-[#34C759]" /> Selesai Dikerjakan (Done)
+            </h4>
+            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+              {completedTasks.length > 0 ? completedTasks.map((task) => (
+                <div key={task.id} className="bg-white p-4 rounded-xl border border-green-100 shadow-xs relative overflow-hidden">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#34C759]"></div>
+                  <p className="text-sm font-medium text-slate-500 leading-snug line-through opacity-70">{task.deskripsi}</p>
+                  <div className="flex items-center justify-between mt-3 text-[11px] text-slate-500 font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <div className="w-5 h-5 bg-green-50 rounded-full flex items-center justify-center text-[9px] text-[#34C759] border border-green-100 font-bold">
+                        {(task.nama || "A").charAt(0).toUpperCase()}
+                      </div> 
+                      <span className="text-slate-600">{task.nama}</span>
+                      <span className="text-slate-400 text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-mono uppercase">({task.role})</span>
+                    </span>
+                    <span className="flex items-center gap-1 text-[#34C759] bg-green-50 px-2 py-0.5 rounded-full text-[10px] font-bold"><CheckCircle2 size={10} /> Selesai</span>
+                  </div>
+                </div>
+              )) : (
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <p className="text-xs text-slate-400 font-medium">Belum ada pencapaian tugas yang terekstraksi.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,10 +1,11 @@
 const mongoose = require('mongoose');
 
-// Ini adalah cetakan bentuk data yang akan disimpan ke database
 const laporanSchema = new mongoose.Schema({
-    nama: { type: String, required: true }, // FITUR BARU: Menyimpan identitas pengirim
+    nama: { type: String, required: true }, 
     teksAsli: { type: String, required: true },
     hasilAI: { type: Object, default: {} },
+    // FITUR BARU: Mengikat laporan ke Workspace tertentu
+    workspaceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true }, 
     tanggalPembuatan: { type: Date, default: Date.now }
 });
 
