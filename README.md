@@ -28,7 +28,7 @@ CodeWorkZ menghilangkan kebutuhan klik manual. AI Gemini kami berperan sebagai *
 ## 🛠️ Tech Stack
 * **Frontend:** React, TypeScript, Tailwind CSS, Recharts (Visualisasi), Lucide-React (Icons).
 * **Backend:** Node.js, Express, MongoDB (Mongoose).
-* **AI Engine:** Google Gemini API 1.5 Flash.
+* **AI Engine:** Google Gemini API 2.5 Flash.
 * **Real-time:** Socket.io.
 * **Utility:** Git Integration (`simple-git`).
 
