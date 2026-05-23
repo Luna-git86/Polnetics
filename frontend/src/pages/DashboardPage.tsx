@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LayoutGrid, BarChart2, Map, Settings, LogOut, Menu, X, ChevronDown, Bell, MessageCircle, Copy, Check, Video } from 'lucide-react';
+import { LayoutGrid, BarChart2, Map, Settings, LogOut, Menu, X, ChevronDown, Bell, MessageCircle, Copy, Check} from 'lucide-react';
 import TeamCanvas from './TeamCanvas';
 import ProjectRoadmap from './ProjectRoadmap';
 import TeamAnalytics from './TeamAnalytics';

@@ -52,7 +52,6 @@ app.get('/', (req, res) => {
 // Jalur Menerima Laporan & Analisis AI
 app.post('/api/laporan', async (req, res) => {
     try {
-        // Tangkap workspaceId dari Frontend
         const { nama, teksLaporan, workspaceId } = req.body;
         
         if (!workspaceId) {
@@ -60,12 +59,25 @@ app.post('/api/laporan', async (req, res) => {
         }
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
+        
+        const tanggalHariIni = new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'});
+
+        // PROMPT BARU: Memaksa AI memberikan tanggal mulai dan selesai secara spesifik
         const prompt = `
             Kamu adalah AI Scrum Master. Baca laporan harian ini: "${teksLaporan}"
-            Balas dengan format JSON murni persis seperti ini:
+            Hari ini adalah tanggal: ${tanggalHariIni}.
+            
+            Tugasmu:
+            1. Ekstrak progres masa lalu dan target saat ini.
+            2. Ekstrak Tanggal Mulai (tanggalMulai) dan Tanggal Selesai (tanggalSelesai) dari teks dalam format baku "YYYY-MM-DD".
+            - Contoh: Jika user berkata "mulai dari 30 Mei sampai 5 Juni 2026", maka tanggalMulai="2026-05-30" dan tanggalSelesai="2026-06-05".
+            - Jika tidak ada tanggal mulai disebutkan, gunakan format "YYYY-MM-DD" untuk hari ini.
+            - Jika tidak ada tanggal selesai disebutkan, tebak durasinya (tambah 1-3 hari dari tanggal mulai).
+            
+            Balas HANYA dengan format JSON murni persis seperti ini:
             {
                 "pastProgress": { "status": "done", "deskripsi": "..." },
-                "currentTarget": { "status": "in-progress", "deskripsi": "..." },
+                "currentTarget": { "status": "in-progress", "deskripsi": "...", "tanggalMulai": "2026-05-30", "tanggalSelesai": "2026-06-05" },
                 "blocker": { "hasBlocker": true/false, "to": "...", "reason": "..." },
                 "metrics": { "velocity": 80, "fatigue": 20, "motivation": 90 }
             }
@@ -80,7 +92,7 @@ app.post('/api/laporan', async (req, res) => {
             nama: nama || "Anonim",
             teksAsli: teksLaporan,
             hasilAI: hasilAI,
-            workspaceId: workspaceId // Simpan ke proyek spesifik
+            workspaceId: workspaceId
         });
         await laporanBaru.save();
 
@@ -191,7 +203,7 @@ app.get('/api/laporan', async (req, res) => {
         console.error("Gagal mengambil data:", error);
         res.status(500).json({ status: "gagal", pesan: "Terjadi kesalahan saat mengambil data." });
     }
-}); // <-- TITIK KRUSIAL: Ini adalah penutup yang benar untuk app.get
+});//AL: Ini adalah penutup yang benar untuk app.get
 
 
 // ==========================================
