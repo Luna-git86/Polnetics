@@ -355,6 +355,31 @@ app.post('/api/webhook', async (req, res) => {
     }
 });
 
+app.post('/api/git/notify-terminal', (req, res) => {
+    try {
+        const { action, pesan, namaUser } = req.body;
+
+        // Notifikasi Pop-up
+        io.emit('notif-workspace', {
+            judul: `Aktivitas Terminal 💻`,
+            pesan: `${namaUser} melakukan ${action}: "${pesan}"`
+        });
+
+        // Kirim Log ke Sidebar Canvas
+        io.emit('git-activity', {
+            user: namaUser,
+            action: action,
+            pesan: pesan,
+            waktu: new Date(),
+            isTerminal: true
+        });
+
+        res.json({ status: "sukses", pesan: "Log terminal berhasil dipancarkan!" });
+    } catch (error) {
+        res.status(500).json({ status: "gagal", pesan: error.message });
+    }
+});
+
 // 1. BUAT WORKSPACE BARU (Otomatis jadi 'Owner')
 app.post('/api/workspace/create', async (req, res) => {
     try {

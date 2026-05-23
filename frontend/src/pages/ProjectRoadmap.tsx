@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Calendar, TrendingUp, Zap, Activity } from 'lucide-react';
+import { AlertTriangle, Calendar, Zap, Activity } from 'lucide-react';
 
 const ProjectRoadmap = () => {
   const [tasks, setTasks] = useState<any[]>([]);
@@ -45,14 +45,12 @@ const ProjectRoadmap = () => {
             const taskName = lap.hasilAI?.currentTarget?.deskripsi || lap.teksAsli.substring(0, 30) + "...";
             const hasBlocker = lap.hasilAI?.blocker?.hasBlocker === true;
 
-            // PERBAIKAN LOGIKA TANGGAL & STATUS:
             let startDate = new Date(lap.tanggalPembuatan);
             startDate.setHours(0,0,0,0);
             let endDate = new Date(startDate);
             
             let menggunakanTanggalAI = false;
 
-            // 1. Coba ambil tanggal spesifik dari AI (jika tersedia)
             if (lap.hasilAI?.currentTarget?.tanggalMulai) {
               const aiStart = new Date(lap.hasilAI.currentTarget.tanggalMulai);
               if (!isNaN(aiStart.getTime())) {
@@ -66,35 +64,29 @@ const ProjectRoadmap = () => {
               if (!isNaN(aiEnd.getTime())) {
                 endDate = aiEnd;
                 endDate.setHours(0,0,0,0);
-                menggunakanTanggalAI = true; // Tandai bahwa AI sukses menemukan target masa depan
+                menggunakanTanggalAI = true; 
               }
             }
 
             if (endDate < startDate) endDate = new Date(startDate);
 
-            // 2. Tentukan status selesai yang SEBENARNYA
             const isTextDone = lap.teksAsli.toLowerCase().match(/selesai|berhasil|done/i);
             let isTrueDone = false;
 
             if (menggunakanTanggalAI) {
-                // Jika AI merumuskan "tanggalSelesai", berarti ini target masa depan, JANGAN dipotong!
                 isTrueDone = false;
             } else {
-                // Jika tidak ada tanggal target, baru kita cek apakah teksnya mengindikasikan sudah selesai
                 if (isTextDone) {
                     isTrueDone = true;
-                    endDate = new Date(startDate); // Tugas selesai dirender 1 hari saja
+                    endDate = new Date(startDate); 
                 } else {
-                    // Tebakan default untuk tugas reguler
                     endDate.setDate(endDate.getDate() + (hasBlocker ? 4 : 2)); 
                 }
             }
 
-            // 3. Perbarui Batas Kalender Global
             if (startDate < minDate) minDate = new Date(startDate);
             if (endDate > maxDate) maxDate = new Date(endDate);
 
-            // 4. Perbarui Metrik Dasbor
             totalTasks++;
             if (isTrueDone) completedTasks++;
             if (hasBlocker) activeBlockers++;
@@ -113,7 +105,6 @@ const ProjectRoadmap = () => {
             };
           }).filter((t: any) => t.name && t.name.length > 5);
 
-          // Kelonggaran 5 hari di ujung kalender
           maxDate.setDate(maxDate.getDate() + 5);
 
           const datesArray = [];
@@ -166,19 +157,10 @@ const ProjectRoadmap = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-[24px] p-6 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between">
-          <div className="flex items-center gap-2 text-[#0071E3] mb-3">
-            <TrendingUp size={18} /> <span className="text-sm font-semibold tracking-tight">Current Progress</span>
-          </div>
-          <div>
-            <h2 className="text-4xl font-semibold tracking-tight text-slate-900 mb-4">{metrics.progress}%</h2>
-            <div className="w-full h-2 bg-[#F5F5F7] rounded-full overflow-hidden">
-              <div className="h-full bg-[#0071E3] rounded-full transition-all duration-1000 ease-out" style={{ width: `${metrics.progress}%` }}></div>
-            </div>
-          </div>
-        </div>
+      {/* Top Cards (Sekarang Jadi 2 Kartu Saja) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         
+        {/* Kartu 1: Timeline Span */}
         <div className="bg-white rounded-[24px] p-6 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between">
           <div className="flex items-center gap-2 text-[#34C759] mb-3">
             <Calendar size={18} /> <span className="text-sm font-semibold tracking-tight">Timeline Span</span>
@@ -191,6 +173,7 @@ const ProjectRoadmap = () => {
           </div>
         </div>
         
+        {/* Kartu 2: AI Estimated Delay */}
         <div className={`bg-white rounded-[24px] p-6 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between ${metrics.delay > 0 ? 'bg-red-50/30' : ''}`}>
           <div className={`flex items-center gap-2 mb-3 ${metrics.delay > 0 ? 'text-[#FF3B30]' : 'text-slate-400'}`}>
             <AlertTriangle size={18} /> <span className="text-sm font-semibold tracking-tight">AI Estimated Delay</span>
@@ -204,8 +187,10 @@ const ProjectRoadmap = () => {
             </p>
           </div>
         </div>
+
       </div>
 
+      {/* === TIMELINE VIEW (GANTT CHART) === */}
       <div className="bg-white rounded-[24px] p-8 border border-black/[0.04] shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex-1 overflow-hidden flex flex-col min-h-[400px]">
         
         {isLoading ? (
